@@ -1,3 +1,5 @@
+pub mod solver;
+
 fn main() {
-    println!("Hello, world!");
+    // TODO
 }
