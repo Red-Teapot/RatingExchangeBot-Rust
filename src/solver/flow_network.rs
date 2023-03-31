@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 
 pub type Id = u16;
-pub type Flow = i32;
+pub type Flow = u16;
 
 #[derive(Copy, Clone, Hash, Eq, PartialEq)]
 pub struct Edge {
@@ -122,6 +122,17 @@ impl FlowNetwork {
 
     pub fn outgoing_edges(&self, vertex: Id) -> &HashSet<Edge> {
         self.outgoing_edges.get(&vertex).unwrap_or(&self.empty)
+    }
+
+    pub fn available_capacity(&self, edge: Edge) -> Flow {
+        let capacity = self.capacity(edge);
+        let flow = self.flow(edge);
+
+        if flow >= capacity {
+            0
+        } else {
+            capacity - flow
+        }
     }
 }
 

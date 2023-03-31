@@ -29,65 +29,22 @@ pub fn solve(network: &mut FlowNetwork) {
             &mut visited,
         );
 
-        {
-            loop {
-                worklist.clear();
-                visited.clear();
-                path.clear();
-                level_graph
-                    .outgoing_edges(source)
-                    .iter()
-                    .for_each(|&e| worklist.push_front(e));
+        let has_blocking_flow = find_blocking_flow(
+            &mut level_graph, 
+            &mut worklist, 
+            &mut visited, 
+            &mut path,
+        );
 
-                while let Some(edge) = worklist.pop_front() {
-                    if level_graph.flow(edge) >= level_graph.capacity(edge) {
-                        continue;
-                    }
+        dbg!(level_graph.flows());
 
-                    path.insert(edge);
+        if !has_blocking_flow {
+            break;
+        }
 
-                    if edge.end == level_graph.sink() {
-                        break;
-                    }
-
-                    let mut should_retreat = true;
-                    let mut outgoing_edges = level_graph.outgoing_edges(edge.end);
-                    if !outgoing_edges.is_empty() {
-                        outgoing_edges.iter().for_each(|&e| {
-                            if visited.insert(e) {
-                                worklist.push_front(e);
-                                should_retreat = false;
-                            }
-                        });
-                    }
-
-                    if should_retreat {
-                        path.remove(&edge);
-                        level_graph.remove_edge(edge.start, edge.end);
-                    }
-                }
-
-                dbg!(&path);
-
-                if path.is_empty() {
-                    break;
-                }
-
-                let path_flow = path
-                    .iter()
-                    .map(|&e| level_graph.capacity(e) - level_graph.flow(e))
-                    .min()
-                    .unwrap();
-                for &edge in &path {
-                    let flow = level_graph.flow(edge);
-                    let capacity = level_graph.capacity(edge);
-                    level_graph.flows_mut().insert(edge, flow + path_flow);
-                    network.flows_mut().insert(edge, flow + path_flow);
-                    if flow + path_flow >= capacity {
-                        level_graph.remove_edge(edge.start, edge.end);
-                    }
-                }
-            }
+        for (&edge, &flow) in level_graph.flows() {
+            let orig_flow = network.flow(edge);
+            network.flows_mut().insert(edge, orig_flow + flow);
         }
 
         dbg!(network.flows());
@@ -158,6 +115,76 @@ fn construct_level_graph(
             }
         });
     }
+}
+
+fn find_blocking_flow(
+    level_graph: &mut FlowNetwork,
+    worklist: &mut LinkedList<Edge>,
+    visited: &mut HashSet<Edge>,
+    path: &mut HashSet<Edge>,
+) -> bool {
+    let source = level_graph.source();
+
+    let mut reached_sink_once = false;
+
+    loop {
+        let mut reached_sink = false;
+
+        worklist.clear();
+        visited.clear();
+        path.clear();
+
+        level_graph
+            .outgoing_edges(source)
+            .iter()
+            .for_each(|&e| worklist.push_front(e));
+
+        while let Some(edge) = worklist.pop_front() {
+            path.insert(edge);
+
+            if edge.end == level_graph.sink() {
+                reached_sink = true;
+                reached_sink_once = true;
+                break;
+            }
+
+            let mut should_retreat = true;
+            level_graph.outgoing_edges(edge.end).iter().for_each(|&e| {
+                if level_graph.available_capacity(e) > 0 && visited.insert(e) {
+                    worklist.push_front(e);
+                    should_retreat = false;
+                }
+            });
+
+            if should_retreat {
+                path.remove(&edge);
+                //level_graph.remove_edge(edge.start, edge.end);
+            }
+        }
+
+        if !reached_sink {
+            break;
+        }
+
+        let path_flow = path
+            .iter()
+            .map(|&e| level_graph.available_capacity(e))
+            .min()
+            .unwrap();
+
+        if path_flow == 0 {
+            break;
+        }
+
+        dbg!(&path, path_flow);
+
+        for &edge in path.iter() {
+            let flow = level_graph.flow(edge);
+            level_graph.flows_mut().insert(edge, flow + path_flow);
+        }
+    }
+
+    reached_sink_once
 }
 
 mod tests {
@@ -427,7 +454,7 @@ mod tests {
         );
     }
 
-    //#[test]
+    #[test]
     fn wikipedia_solve() {
         let mut network = FlowNetwork::empty(0, 5);
         network.add_edge(0, 1, 10, 0);
@@ -448,6 +475,7 @@ mod tests {
                 edge(0, 1) => 10,
                 edge(0, 2) => 9,
                 edge(1, 2) => 0,
+                edge(1, 3) => 4,
                 edge(1, 4) => 6,
                 edge(2, 4) => 9,
                 edge(3, 5) => 9,
