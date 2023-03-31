@@ -1,13 +1,13 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 
-type Id = u16;
-type Flow = u16;
+pub type Id = u16;
+pub type Flow = i32;
 
 #[derive(Copy, Clone, Hash, Eq, PartialEq)]
 pub struct Edge {
-    start: Id,
-    end: Id,
+    pub start: Id,
+    pub end: Id,
 }
 
 impl Debug for Edge {
@@ -29,6 +29,7 @@ pub struct FlowNetwork {
     incoming_edges: HashMap<Id, HashSet<Edge>>,
     source: Id,
     sink: Id,
+    empty: HashSet<Edge>, // FIXME: Replace this with something better.
 }
 
 impl FlowNetwork {
@@ -41,6 +42,7 @@ impl FlowNetwork {
             incoming_edges: HashMap::new(),
             source,
             sink,
+            empty: HashSet::new(),
         }
     }
 
@@ -77,6 +79,50 @@ impl FlowNetwork {
             self.incoming_edges.remove(&end);
         }
     }
+
+    pub fn clear(&mut self) {
+        self.edges.clear();
+        self.capacities.clear();
+        self.flows.clear();
+        self.outgoing_edges.clear();
+        self.incoming_edges.clear();
+    }
+
+    pub fn source(&self) -> Id {
+        self.source
+    }
+
+    pub fn sink(&self) -> Id {
+        self.sink
+    }
+
+    pub fn edges(&self) -> &HashSet<Edge> {
+        &self.edges
+    }
+
+    pub fn flows(&self) -> &HashMap<Edge, Flow> {
+        &self.flows
+    }
+
+    pub fn flows_mut(&mut self) -> &mut HashMap<Edge, Flow> {
+        &mut self.flows
+    }
+
+    pub fn capacities(&self) -> &HashMap<Edge, Flow> {
+        &self.capacities
+    }
+
+    pub fn capacity(&self, edge: Edge) -> Flow {
+        *self.capacities.get(&edge).unwrap_or(&0)
+    }
+
+    pub fn flow(&self, edge: Edge) -> Flow {
+        *self.flows.get(&edge).unwrap_or(&0)
+    }
+
+    pub fn outgoing_edges(&self, vertex: Id) -> &HashSet<Edge> {
+        self.outgoing_edges.get(&vertex).unwrap_or(&self.empty)
+    }
 }
 
 mod tests {
@@ -110,41 +156,56 @@ mod tests {
         assert_eq!(network.source, 0);
         assert_eq!(network.sink, 3);
 
-        assert_eq!(network.edges, set! {
-            edge(0, 1),
-            edge(1, 3),
-            edge(0, 2),
-            edge(2, 3),
-            edge(1, 2),
-        });
+        assert_eq!(
+            network.edges,
+            set! {
+                edge(0, 1),
+                edge(1, 3),
+                edge(0, 2),
+                edge(2, 3),
+                edge(1, 2),
+            }
+        );
 
-        assert_eq!(network.capacities, map! {
-            edge(0, 1) => 5,
-            edge(1, 3) => 19,
-            edge(0, 2) => 3,
-            edge(2, 3) => 0,
-            edge(1, 2) => 3,
-        });
+        assert_eq!(
+            network.capacities,
+            map! {
+                edge(0, 1) => 5,
+                edge(1, 3) => 19,
+                edge(0, 2) => 3,
+                edge(2, 3) => 0,
+                edge(1, 2) => 3,
+            }
+        );
 
-        assert_eq!(network.flows, map! {
-            edge(0, 1) => 0,
-            edge(1, 3) => 10,
-            edge(0, 2) => 3,
-            edge(2, 3) => 0,
-            edge(1, 2) => 0,
-        });
+        assert_eq!(
+            network.flows,
+            map! {
+                edge(0, 1) => 0,
+                edge(1, 3) => 10,
+                edge(0, 2) => 3,
+                edge(2, 3) => 0,
+                edge(1, 2) => 0,
+            }
+        );
 
-        assert_eq!(network.outgoing_edges, map!{
-            0 => set!(edge(0, 1), edge(0, 2)),
-            1 => set!(edge(1, 3), edge(1, 2)),
-            2 => set!(edge(2, 3)),
-        });
+        assert_eq!(
+            network.outgoing_edges,
+            map! {
+                0 => set!(edge(0, 1), edge(0, 2)),
+                1 => set!(edge(1, 3), edge(1, 2)),
+                2 => set!(edge(2, 3)),
+            }
+        );
 
-        assert_eq!(network.incoming_edges, map!{
-            1 => set!(edge(0, 1)),
-            2 => set!(edge(0, 2), edge(1, 2)),
-            3 => set!(edge(1, 3), edge(2, 3)),
-        });
+        assert_eq!(
+            network.incoming_edges,
+            map! {
+                1 => set!(edge(0, 1)),
+                2 => set!(edge(0, 2), edge(1, 2)),
+                3 => set!(edge(1, 3), edge(2, 3)),
+            }
+        );
     }
 
     #[test]
@@ -163,29 +224,44 @@ mod tests {
         assert_eq!(network.source, 0);
         assert_eq!(network.sink, 3);
 
-        assert_eq!(network.edges, set! {
-            edge(0, 1),
-            edge(1, 2),
-        });
+        assert_eq!(
+            network.edges,
+            set! {
+                edge(0, 1),
+                edge(1, 2),
+            }
+        );
 
-        assert_eq!(network.capacities, map! {
-            edge(0, 1) => 5,
-            edge(1, 2) => 3,
-        });
+        assert_eq!(
+            network.capacities,
+            map! {
+                edge(0, 1) => 5,
+                edge(1, 2) => 3,
+            }
+        );
 
-        assert_eq!(network.flows, map! {
-            edge(0, 1) => 0,
-            edge(1, 2) => 0,
-        });
+        assert_eq!(
+            network.flows,
+            map! {
+                edge(0, 1) => 0,
+                edge(1, 2) => 0,
+            }
+        );
 
-        assert_eq!(network.outgoing_edges, map!{
-            0 => set!(edge(0, 1)),
-            1 => set!(edge(1, 2)),
-        });
+        assert_eq!(
+            network.outgoing_edges,
+            map! {
+                0 => set!(edge(0, 1)),
+                1 => set!(edge(1, 2)),
+            }
+        );
 
-        assert_eq!(network.incoming_edges, map!{
-            1 => set!(edge(0, 1)),
-            2 => set!(edge(1, 2)),
-        });
+        assert_eq!(
+            network.incoming_edges,
+            map! {
+                1 => set!(edge(0, 1)),
+                2 => set!(edge(1, 2)),
+            }
+        );
     }
 }
