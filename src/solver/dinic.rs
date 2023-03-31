@@ -5,7 +5,6 @@ pub fn solve(network: &mut FlowNetwork) {
     let source = network.source();
     let sink = network.sink();
 
-    // 0. Clear the flow values
     network
         .flows_mut()
         .iter_mut()
@@ -29,14 +28,8 @@ pub fn solve(network: &mut FlowNetwork) {
             &mut visited,
         );
 
-        let has_blocking_flow = find_blocking_flow(
-            &mut level_graph, 
-            &mut worklist, 
-            &mut visited, 
-            &mut path,
-        );
-
-        dbg!(level_graph.flows());
+        let has_blocking_flow =
+            find_blocking_flow(&mut level_graph, &mut worklist, &mut visited, &mut path);
 
         if !has_blocking_flow {
             break;
@@ -46,8 +39,6 @@ pub fn solve(network: &mut FlowNetwork) {
             let orig_flow = network.flow(edge);
             network.flows_mut().insert(edge, orig_flow + flow);
         }
-
-        dbg!(network.flows());
     }
 }
 
@@ -175,8 +166,6 @@ fn find_blocking_flow(
         if path_flow == 0 {
             break;
         }
-
-        dbg!(&path, path_flow);
 
         for &edge in path.iter() {
             let flow = level_graph.flow(edge);
