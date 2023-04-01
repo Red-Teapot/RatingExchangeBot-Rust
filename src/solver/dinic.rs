@@ -15,7 +15,7 @@ pub fn solve(network: &mut FlowNetwork) {
     let mut path = LinkedList::new();
 
     loop {
-        construct_residual_graph(&network, &mut residual_graph);
+        construct_residual_graph(network, &mut residual_graph);
 
         if log_enabled!(log::Level::Trace) {
             trace!("Residual graph:\n{residual_graph:?}");
@@ -209,15 +209,15 @@ fn find_blocking_flow(
     reached_sink_once
 }
 
+#[cfg(test)]
 mod tests {
-    #[cfg(test)]
     use test_log::test;
 
     use std::collections::{HashMap, HashSet, LinkedList};
 
     use map_macro::map;
 
-    use crate::solver::flow_network::{edge, Edge, Flow, FlowNetwork};
+    use crate::solver::flow_network::{edge, Flow, FlowNetwork};
 
     use super::{construct_level_graph, construct_residual_graph, solve};
 

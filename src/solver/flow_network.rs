@@ -66,14 +66,12 @@ impl FlowNetwork {
         self.capacities.insert(edge, capacity);
         self.flows.insert(edge, flow);
 
-        if !self.outgoing_edges.contains_key(&start) {
-            self.outgoing_edges.insert(start, HashSet::new());
-        }
+        self.outgoing_edges
+            .entry(start)
+            .or_insert_with(HashSet::new);
         self.outgoing_edges.get_mut(&start).unwrap().insert(edge);
 
-        if !self.incoming_edges.contains_key(&end) {
-            self.incoming_edges.insert(end, HashSet::new());
-        }
+        self.incoming_edges.entry(end).or_insert_with(HashSet::new);
         self.incoming_edges.get_mut(&end).unwrap().insert(edge);
     }
 
@@ -227,7 +225,7 @@ impl FlowNetwork {
 
 impl Debug for FlowNetwork {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut edges = self.edges().iter().map(|&e| e).collect::<Vec<Edge>>();
+        let mut edges = self.edges().iter().copied().collect::<Vec<Edge>>();
         edges.sort_by(|&a, &b| {
             use std::cmp::Ordering::*;
 
@@ -248,7 +246,10 @@ impl Debug for FlowNetwork {
     }
 }
 
+#[cfg(test)]
 mod tests {
+    use test_log::test;
+
     use std::collections::{HashMap, HashSet};
 
     use map_macro::{map, set};
