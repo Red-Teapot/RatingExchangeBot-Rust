@@ -2,26 +2,110 @@
 
 use log::*;
 
-use crate::solver::dinic;
-use crate::solver::flow_network::FlowNetwork;
+use poise::{
+    send_application_reply,
+    serenity_prelude::{self as serenity, CacheHttp},
+};
+use sqlx::{postgres::PgPoolOptions, PgPool};
 
+pub mod env_vars;
 pub mod solver;
 
-fn main() {
-    pretty_env_logger::init();
+struct BotState {}
 
-    let mut network = FlowNetwork::empty(0, 5);
-    network.add_edge((0, 1), 10, 0);
-    network.add_edge((0, 2), 10, 0);
-    network.add_edge((1, 2), 2, 0);
-    network.add_edge((1, 4), 8, 0);
-    network.add_edge((1, 3), 4, 0);
-    network.add_edge((2, 4), 9, 0);
-    network.add_edge((3, 5), 10, 0);
-    network.add_edge((4, 3), 6, 0);
-    network.add_edge((4, 5), 10, 0);
+type Error = anyhow::Error;
+type CommandResult = Result<(), Error>;
+type Context<'a> = poise::Context<'a, BotState, Error>;
 
-    dinic::solve(&mut network);
+/// Register slash commands in this server.
+#[poise::command(prefix_command)]
+async fn register(ctx: Context<'_>) -> CommandResult {
+    poise::builtins::register_in_guild(
+        ctx.http(),
+        &ctx.framework().options.commands,
+        ctx.guild_id().unwrap(),
+    )
+    .await?;
+    ctx.say("Registered!").await?;
+    Ok(())
+}
 
-    info!("Network:\n{network:?}");
+/// Say hello
+///
+/// Longer description of the command.
+/// It even has multiple lines.
+/// Yay.
+#[poise::command(slash_command, subcommands("foo", "bar"))]
+async fn reb(ctx: Context<'_>) -> CommandResult {
+    ctx.say("reb result").await?;
+    Ok(())
+}
+
+#[poise::command(slash_command, subcommands("lol", "kek"))]
+async fn foo(ctx: Context<'_>) -> CommandResult {
+    ctx.say("foo result").await?;
+    Ok(())
+}
+
+#[poise::command(slash_command)]
+async fn lol(ctx: Context<'_>) -> CommandResult {
+    ctx.say("lol result").await?;
+    Ok(())
+}
+
+#[poise::command(slash_command)]
+async fn kek(ctx: Context<'_>) -> CommandResult {
+    ctx.say("kek result").await?;
+    Ok(())
+}
+
+#[poise::command(slash_command)]
+async fn bar(ctx: Context<'_>) -> CommandResult {
+    ctx.say("bar result").await?;
+    Ok(())
+}
+
+#[tokio::main]
+async fn main() {
+    env_logger::init();
+
+    if let Err(err) = envmnt::load_file(".env") {
+        warn!("Could not load .env file: {err}");
+    }
+
+    if !env_vars::check_required_vars() {
+        std::process::exit(255);
+    }
+
+    let pool = match setup_database().await {
+        Ok(pool) => pool,
+        Err(err) => {
+            error!("Could not setup database: {err}");
+            std::process::exit(255);
+        }
+    };
+
+    let framework = poise::Framework::builder()
+        .options(poise::FrameworkOptions {
+            commands: vec![register(), reb()],
+            ..Default::default()
+        })
+        .token(env_vars::DISCORD_BOT_TOKEN.required())
+        .intents(serenity::GatewayIntents::GUILD_MESSAGES)
+        .setup(|ctx, ready, framework| {
+            Box::pin(async move {
+                //poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                Ok(BotState {})
+            })
+        });
+
+    framework.run().await.unwrap();
+}
+
+async fn setup_database() -> anyhow::Result<PgPool> {
+    let pool = PgPoolOptions::new()
+        .connect(&env_vars::DATABASE_URL.required())
+        .await?;
+    sqlx::migrate!("./migrations").run(&pool).await?;
+    Ok(pool)
 }
