@@ -3,8 +3,7 @@
 use log::*;
 
 use poise::{
-    send_application_reply,
-    serenity_prelude::{self as serenity, CacheHttp},
+    serenity_prelude::{self as serenity, CacheHttp, GuildId},
 };
 use sqlx::{postgres::PgPoolOptions, PgPool};
 
@@ -73,11 +72,11 @@ async fn main() {
         warn!("Could not load .env file: {err}");
     }
 
-    if !env_vars::check_required_vars() {
+    if !env_vars::check() {
         std::process::exit(255);
     }
 
-    let pool = match setup_database().await {
+    let _pool = match setup_database().await {
         Ok(pool) => pool,
         Err(err) => {
             error!("Could not setup database: {err}");
@@ -92,9 +91,33 @@ async fn main() {
         })
         .token(env_vars::DISCORD_BOT_TOKEN.required())
         .intents(serenity::GatewayIntents::GUILD_MESSAGES)
-        .setup(|ctx, ready, framework| {
+        .setup(|ctx, _ready, framework| {
             Box::pin(async move {
-                //poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                let commands = &framework.options().commands;
+
+                if env_vars::REGISTER_COMMANDS_GLOBALLY.get_bool(false) {
+                    info!("Registering commands globally");
+                    poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                }
+
+                if let Some(guilds_str) = env_vars::REGISTER_COMMANDS_IN_GUILDS.option() {
+                    let guilds = guilds_str
+                        .split(',')
+                        .map(|s| s.trim())
+                        .map(|s| s.parse::<u64>().unwrap())
+                        .map(|id| GuildId(id));
+
+                    for guild in guilds {
+                        let guild_name = ctx.http.get_guild(guild.0).await
+                            .map(|g| g.name)
+                            .unwrap_or("???".to_string());
+
+                        info!("Registering commands in guild {guild} ({guild_name})");
+
+                        poise::builtins::register_in_guild(ctx, commands, guild).await?;
+                    }
+                }
+
                 Ok(BotState {})
             })
         });
