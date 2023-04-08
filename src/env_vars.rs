@@ -35,9 +35,7 @@ fn uint_list(string: &str) -> bool {
     string
         .split(',')
         .map(|s| s.trim())
-        .all(|s| {
-            !s.is_empty() && s.chars().all(|c| c.is_ascii_digit())
-        })
+        .all(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit()))
 }
 
 pub fn check() -> bool {

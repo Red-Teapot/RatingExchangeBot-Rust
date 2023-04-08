@@ -2,9 +2,7 @@
 
 use log::*;
 
-use poise::{
-    serenity_prelude::{self as serenity, CacheHttp, GuildId},
-};
+use poise::serenity_prelude::{self as serenity, CacheHttp, GuildId};
 use sqlx::{postgres::PgPoolOptions, PgPool};
 
 pub mod env_vars;
@@ -105,10 +103,13 @@ async fn main() {
                         .split(',')
                         .map(|s| s.trim())
                         .map(|s| s.parse::<u64>().unwrap())
-                        .map(|id| GuildId(id));
+                        .map(GuildId);
 
                     for guild in guilds {
-                        let guild_name = ctx.http.get_guild(guild.0).await
+                        let guild_name = ctx
+                            .http
+                            .get_guild(guild.0)
+                            .await
                             .map(|g| g.name)
                             .unwrap_or("???".to_string());
 
