@@ -2,65 +2,19 @@
 
 use log::*;
 
-use poise::serenity_prelude::{self as serenity, CacheHttp, GuildId};
+use poise::serenity_prelude::{self as serenity, GuildId};
 use sqlx::{postgres::PgPoolOptions, PgPool};
+use tiny_tokio_actor::*;
 
-pub mod env_vars;
-pub mod solver;
+mod commands;
+mod env_vars;
+mod solver;
 
-struct BotState {}
+pub struct BotState {}
 
-type Error = anyhow::Error;
-type CommandResult = Result<(), Error>;
-type Context<'a> = poise::Context<'a, BotState, Error>;
-
-/// Register slash commands in this server.
-#[poise::command(prefix_command)]
-async fn register(ctx: Context<'_>) -> CommandResult {
-    poise::builtins::register_in_guild(
-        ctx.http(),
-        &ctx.framework().options.commands,
-        ctx.guild_id().unwrap(),
-    )
-    .await?;
-    ctx.say("Registered!").await?;
-    Ok(())
-}
-
-/// Say hello
-///
-/// Longer description of the command.
-/// It even has multiple lines.
-/// Yay.
-#[poise::command(slash_command, subcommands("foo", "bar"))]
-async fn reb(ctx: Context<'_>) -> CommandResult {
-    ctx.say("reb result").await?;
-    Ok(())
-}
-
-#[poise::command(slash_command, subcommands("lol", "kek"))]
-async fn foo(ctx: Context<'_>) -> CommandResult {
-    ctx.say("foo result").await?;
-    Ok(())
-}
-
-#[poise::command(slash_command)]
-async fn lol(ctx: Context<'_>) -> CommandResult {
-    ctx.say("lol result").await?;
-    Ok(())
-}
-
-#[poise::command(slash_command)]
-async fn kek(ctx: Context<'_>) -> CommandResult {
-    ctx.say("kek result").await?;
-    Ok(())
-}
-
-#[poise::command(slash_command)]
-async fn bar(ctx: Context<'_>) -> CommandResult {
-    ctx.say("bar result").await?;
-    Ok(())
-}
+#[derive(Clone)]
+struct RebotSystemEvent {}
+impl SystemEvent for RebotSystemEvent {}
 
 #[tokio::main]
 async fn main() {
@@ -82,9 +36,12 @@ async fn main() {
         }
     };
 
+    let bus = EventBus::<RebotSystemEvent>::new(512);
+    let _system = ActorSystem::new("rebot", bus);
+
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![register(), reb()],
+            commands: vec![commands::reb()],
             ..Default::default()
         })
         .token(env_vars::DISCORD_BOT_TOKEN.required())
