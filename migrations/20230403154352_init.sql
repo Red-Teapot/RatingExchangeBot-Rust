@@ -8,14 +8,14 @@ CREATE TABLE exchanges (
 
 CREATE TABLE exchange_rounds (
     id SERIAL PRIMARY KEY,
-    exchange_id BIGINT, 
-    submissions_start_at TIMESTAMPTZ,
-    submissions_end_at TIMESTAMPTZ,
-    assignments_sent_at TIMESTAMPTZ,
+    exchange_id BIGINT,
+    submissions_start_at TIMESTAMP,
+    submissions_end_at TIMESTAMP,
+    assignments_sent_at TIMESTAMP,
     state INT,
 
-    CONSTRAINT fk_exchange 
-        FOREIGN KEY (exchange_id) 
+    CONSTRAINT fk_exchange
+        FOREIGN KEY (exchange_id)
         REFERENCES exchanges(id)
         ON DELETE CASCADE
 );
@@ -25,10 +25,10 @@ CREATE TABLE submissions (
     exchange_round_id BIGINT,
     link VARCHAR(64),
     submitter BIGINT,
-    submitted_at TIMESTAMPTZ,
+    submitted_at TIMESTAMP,
 
-    CONSTRAINT fk_exchange_round 
-        FOREIGN KEY (exchange_round_id) 
+    CONSTRAINT fk_exchange_round
+        FOREIGN KEY (exchange_round_id)
         REFERENCES exchange_rounds(id)
         ON DELETE CASCADE,
 
@@ -38,7 +38,7 @@ CREATE TABLE submissions (
 CREATE TABLE played_games (
     id SERIAL PRIMARY KEY,
     link VARCHAR(64),
-    member INTEGER,
+    member BIGINT,
     is_manual BOOLEAN,
 
     UNIQUE (link, member)

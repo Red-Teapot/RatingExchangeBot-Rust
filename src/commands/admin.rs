@@ -21,7 +21,7 @@ pub enum JamType {
     LudumDare,
 }
 
-/// Create a rating exchange
+/// Create a rating exchange.
 #[allow(clippy::too_many_arguments)]
 #[poise::command(slash_command, rename = "create")]
 pub async fn exchange_create(

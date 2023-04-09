@@ -2,7 +2,7 @@ use poise::samples::HelpConfiguration;
 
 use crate::commands::*;
 
-/// Provides help for the available bot commands.
+/// Provide help for available bot commands.
 #[poise::command(slash_command, ephemeral)]
 pub async fn help(
     ctx: Context<'_>,
@@ -20,7 +20,7 @@ pub async fn help(
     Ok(())
 }
 
-/// Submits your game to the active review exchange.
+/// Submit your game to the active review exchange.
 #[poise::command(slash_command, ephemeral)]
 pub async fn submit(
     ctx: Context<'_>,
@@ -33,7 +33,7 @@ pub async fn submit(
     Ok(())
 }
 
-/// Revokes your submission from the active review exchange.
+/// Revoke your submission from the active review exchange.
 #[poise::command(slash_command, ephemeral)]
 pub async fn revoke(
     ctx: Context<'_>,
@@ -44,7 +44,7 @@ pub async fn revoke(
     Ok(())
 }
 
-/// Registers the game as played, so the bot won't assign it to you.
+/// Register the game as played, so the bot won't assign it to you.
 #[poise::command(slash_command, ephemeral)]
 pub async fn played(ctx: Context<'_>, #[description = "Game link"] _link: String) -> CommandResult {
     ctx.say("Registering played games is not implemented yet")

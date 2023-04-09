@@ -7,6 +7,7 @@ use sqlx::{postgres::PgPoolOptions, PgPool};
 use tiny_tokio_actor::*;
 
 mod commands;
+mod data;
 mod env_vars;
 mod solver;
 
