@@ -9,7 +9,6 @@ pub enum JamType {
     LudumDare,
 }
 
-#[allow(dead_code)]
 impl JamType {
     pub fn jam_link_example(&self) -> &'static str {
         use JamType::*;

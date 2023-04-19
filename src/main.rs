@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+#![allow(dead_code)] // TODO: Remove this before the first release.
 
 use log::*;
 
@@ -9,7 +10,9 @@ use tiny_tokio_actor::*;
 mod commands;
 mod data;
 mod env_vars;
+mod jam_types;
 mod solver;
+mod storage;
 
 pub struct BotState {}
 

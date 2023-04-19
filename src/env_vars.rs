@@ -71,7 +71,6 @@ pub struct EnvVar {
     validator: fn(&str) -> bool,
 }
 
-#[allow(dead_code)]
 impl EnvVar {
     pub fn get(&self, default: &str) -> String {
         std::env::var(self.name).unwrap_or(default.to_string())

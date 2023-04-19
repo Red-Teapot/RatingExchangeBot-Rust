@@ -8,8 +8,13 @@ log = "0.4.17"
 env_logger = "0.10.0"
 envmnt = "0.10.4"
 anyhow = "1.0.70"
+thiserror = "1.0.40"
+once_cell = "1.17.1"
 
 time = "0.3.20"
+regex = "1.7.3"
+lazy-regex = "2.5.0"
+deunicode = "1.3.3"
 
 tokio = "1.27.0"
 tiny-tokio-actor = "0.3.3"
