@@ -1,12 +1,12 @@
 use std::str::FromStr;
 
 use lazy_regex::regex_captures;
-use time::{Date, Month, Time, UtcOffset};
+use time::{Date, Duration, Month, OffsetDateTime, Time, UtcOffset};
 
 use crate::commands::CommandError;
 
 const EXAMPLE_1: &str = "2023-06-24 15:33:40 UTC+7";
-const EXAMPLE_2: &str = "15:33";
+const EXAMPLE_2: &str = "15:33 UTC";
 
 fn invalid_argument(message: String) -> CommandError {
     super::invalid_argument(format!(
@@ -18,7 +18,35 @@ fn invalid_argument(message: String) -> CommandError {
 pub struct HumanDateTime {
     date: Option<Date>,
     time: Option<Time>,
-    utc_offset: Option<UtcOffset>,
+    utc_offset: UtcOffset,
+}
+
+impl HumanDateTime {
+    pub fn materialize(&self, mut base_date: OffsetDateTime) -> OffsetDateTime {
+        base_date = base_date.to_offset(self.utc_offset);
+
+        match (self.date, self.time) {
+            (Some(date), Some(time)) => {
+                base_date = base_date.replace_date(date).replace_time(time);
+            }
+
+            (Some(date), None) => {
+                base_date = base_date.replace_date(date);
+            }
+
+            (None, Some(time)) => {
+                if time <= base_date.time() {
+                    base_date += Duration::days(1);
+                }
+
+                base_date = base_date.replace_time(time);
+            }
+
+            (None, None) => panic!("HumanDateTime must have either date or time"),
+        }
+
+        base_date
+    }
 }
 
 impl FromStr for HumanDateTime {
@@ -117,6 +145,13 @@ impl FromStr for HumanDateTime {
             }
         }
 
+        let utc_offset = match utc_offset {
+            Some(offset) => offset,
+            None => {
+                return Err(invalid_argument("No UTC offset is provided.".to_string()));
+            }
+        };
+
         if let (None, None) = (date, time) {
             return Err(invalid_argument(
                 "Neither date nor time is provided.".to_string(),
@@ -135,7 +170,10 @@ impl FromStr for HumanDateTime {
 mod tests {
     use std::str::FromStr;
 
-    use time::{Date, Month, Time, UtcOffset};
+    use time::{
+        macros::{date, datetime, offset, time},
+        UtcOffset,
+    };
 
     use crate::commands::arguments::{
         human_datetime::{EXAMPLE_1, EXAMPLE_2},
@@ -147,9 +185,9 @@ mod tests {
         assert_eq!(
             HumanDateTime::from_str(EXAMPLE_1).unwrap(),
             HumanDateTime {
-                date: Some(Date::from_calendar_date(2023, Month::June, 24).unwrap()),
-                time: Some(Time::from_hms(15, 33, 40).unwrap()),
-                utc_offset: Some(UtcOffset::from_hms(7, 0, 0).unwrap()),
+                date: Some(date!(2023 - 06 - 24)),
+                time: Some(time!(15:33:40)),
+                utc_offset: offset!(+7:00),
             }
         );
     }
@@ -160,8 +198,8 @@ mod tests {
             HumanDateTime::from_str(EXAMPLE_2).unwrap(),
             HumanDateTime {
                 date: None,
-                time: Some(Time::from_hms(15, 33, 0).unwrap()),
-                utc_offset: None,
+                time: Some(time!(15:33:00)),
+                utc_offset: UtcOffset::UTC,
             }
         );
     }
@@ -171,9 +209,9 @@ mod tests {
         assert_eq!(
             HumanDateTime::from_str("2023-02-15 14:37:22 UTC+7").unwrap(),
             HumanDateTime {
-                date: Some(Date::from_calendar_date(2023, Month::February, 15).unwrap()),
-                time: Some(Time::from_hms(14, 37, 22).unwrap()),
-                utc_offset: Some(UtcOffset::from_hms(7, 0, 0).unwrap()),
+                date: Some(date!(2023 - 02 - 15)),
+                time: Some(time!(14:37:22)),
+                utc_offset: offset!(+7:00),
             }
         );
     }
@@ -183,33 +221,9 @@ mod tests {
         assert_eq!(
             HumanDateTime::from_str("2023-02-15 14:37 UTC-2:30").unwrap(),
             HumanDateTime {
-                date: Some(Date::from_calendar_date(2023, Month::February, 15).unwrap()),
-                time: Some(Time::from_hms(14, 37, 0).unwrap()),
-                utc_offset: Some(UtcOffset::from_hms(-2, -30, 0).unwrap()),
-            }
-        );
-    }
-
-    #[test]
-    fn date_hms() {
-        assert_eq!(
-            HumanDateTime::from_str("2005-12-31 00:59:40").unwrap(),
-            HumanDateTime {
-                date: Some(Date::from_calendar_date(2005, Month::December, 31).unwrap()),
-                time: Some(Time::from_hms(0, 59, 40).unwrap()),
-                utc_offset: None,
-            }
-        );
-    }
-
-    #[test]
-    fn date_hm() {
-        assert_eq!(
-            HumanDateTime::from_str("2023-01-01 23:59").unwrap(),
-            HumanDateTime {
-                date: Some(Date::from_calendar_date(2023, Month::January, 1).unwrap()),
-                time: Some(Time::from_hms(23, 59, 0).unwrap()),
-                utc_offset: None,
+                date: Some(date!(2023 - 02 - 15)),
+                time: Some(time!(14:37:00)),
+                utc_offset: offset!(-2:30),
             }
         );
     }
@@ -220,8 +234,8 @@ mod tests {
             HumanDateTime::from_str("00:30:59 UTC+12").unwrap(),
             HumanDateTime {
                 date: None,
-                time: Some(Time::from_hms(0, 30, 59).unwrap()),
-                utc_offset: Some(UtcOffset::from_hms(12, 0, 0).unwrap()),
+                time: Some(time!(00:30:59)),
+                utc_offset: offset!(+12:00),
             }
         );
     }
@@ -232,32 +246,8 @@ mod tests {
             HumanDateTime::from_str("00:59 UTC-10:30").unwrap(),
             HumanDateTime {
                 date: None,
-                time: Some(Time::from_hms(0, 59, 0).unwrap()),
-                utc_offset: Some(UtcOffset::from_hms(-10, 30, 0).unwrap()),
-            }
-        );
-    }
-
-    #[test]
-    fn hms() {
-        assert_eq!(
-            HumanDateTime::from_str("12:32:47").unwrap(),
-            HumanDateTime {
-                date: None,
-                time: Some(Time::from_hms(12, 32, 47).unwrap()),
-                utc_offset: None,
-            }
-        );
-    }
-
-    #[test]
-    fn hm() {
-        assert_eq!(
-            HumanDateTime::from_str("20:14").unwrap(),
-            HumanDateTime {
-                date: None,
-                time: Some(Time::from_hms(20, 14, 0).unwrap()),
-                utc_offset: None,
+                time: Some(time!(00:59:00)),
+                utc_offset: offset!(-10:30),
             }
         );
     }
@@ -267,9 +257,9 @@ mod tests {
         assert_eq!(
             HumanDateTime::from_str("1987-02-18 UTC").unwrap(),
             HumanDateTime {
-                date: Some(Date::from_calendar_date(1987, Month::February, 18).unwrap()),
+                date: Some(date!(1987 - 02 - 18)),
                 time: None,
-                utc_offset: Some(UtcOffset::UTC),
+                utc_offset: UtcOffset::UTC,
             }
         );
     }
@@ -280,8 +270,8 @@ mod tests {
             HumanDateTime::from_str("07:23:12 UTC").unwrap(),
             HumanDateTime {
                 date: None,
-                time: Some(Time::from_hms(7, 23, 12).unwrap()),
-                utc_offset: Some(UtcOffset::UTC),
+                time: Some(time!(07:23:12)),
+                utc_offset: UtcOffset::UTC,
             }
         );
     }
@@ -289,5 +279,83 @@ mod tests {
     #[test]
     fn only_offset() {
         assert!(HumanDateTime::from_str("UTC+2").is_err());
+    }
+
+    #[test]
+    fn materialize_date_time_offset() {
+        assert_eq!(
+            HumanDateTime {
+                date: Some(date!(2023 - 04 - 13)),
+                time: Some(time!(18:06:30)),
+                utc_offset: offset!(+7:45),
+            }
+            .materialize(datetime!(2022-12-12 07:59:30 -4)),
+            datetime!(2023-04-13 18:06:30 +7:45)
+        )
+    }
+
+    #[test]
+    fn materialize_date_time_utc() {
+        assert_eq!(
+            HumanDateTime {
+                date: Some(date!(2023 - 04 - 13)),
+                time: Some(time!(18:06:30)),
+                utc_offset: UtcOffset::UTC,
+            }
+            .materialize(datetime!(2022-12-12 07:59:30 UTC)),
+            datetime!(2023-04-13 18:06:30 UTC)
+        )
+    }
+
+    #[test]
+    fn materialize_date_offset() {
+        assert_eq!(
+            HumanDateTime {
+                date: Some(date!(2023 - 04 - 13)),
+                time: None,
+                utc_offset: offset!(+8),
+            }
+            .materialize(datetime!(2022-12-12 07:59:30 +3)),
+            datetime!(2023-04-13 12:59:30 +8)
+        )
+    }
+
+    #[test]
+    fn materialize_date_utc() {
+        assert_eq!(
+            HumanDateTime {
+                date: Some(date!(2023 - 04 - 13)),
+                time: None,
+                utc_offset: UtcOffset::UTC,
+            }
+            .materialize(datetime!(2022-12-12 07:59:30 UTC)),
+            datetime!(2023-04-13 07:59:30 UTC)
+        )
+    }
+
+    #[test]
+    fn materialize_time_offset() {
+        assert_eq!(
+            HumanDateTime {
+                date: None,
+                time: Some(time!(02:00:23)),
+                utc_offset: offset!(-10:30),
+            }
+            .materialize(datetime!(2023-04-13 07:59:30 UTC)),
+            datetime!(2023-04-13 02:00:23 -10:30)
+        )
+    }
+
+    #[test]
+    fn materialize_time_utc() {
+        assert_eq!(
+            HumanDateTime {
+                date: None,
+                time: Some(time!(13:02:00)),
+                utc_offset: UtcOffset::UTC,
+            }
+            .materialize(datetime!(2023-04-21 18:22:34 UTC)),
+            datetime!(2023-04-22 13:02:00 UTC)
+        )
     }
 }
