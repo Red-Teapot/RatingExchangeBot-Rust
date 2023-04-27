@@ -1,24 +1,23 @@
 #![forbid(unsafe_code)]
 #![allow(dead_code)] // TODO: Remove this before the first release.
 
-use log::*;
-
-use poise::serenity_prelude::{self as serenity, GuildId};
-use sqlx::{postgres::PgPoolOptions, PgPool};
-use tiny_tokio_actor::*;
-
 mod commands;
 mod data;
 mod env_vars;
 mod jam_types;
 mod solver;
 mod storage;
+mod utils;
 
-pub struct BotState {}
+use log::*;
 
-#[derive(Clone)]
-struct RebotSystemEvent {}
-impl SystemEvent for RebotSystemEvent {}
+use poise::serenity_prelude::{self as serenity, GuildId};
+use sqlx::{postgres::PgPoolOptions, PgPool};
+use storage::ExchangeStorage;
+
+pub struct BotState {
+    pub exchange_storage: ExchangeStorage,
+}
 
 #[tokio::main]
 async fn main() {
@@ -32,16 +31,19 @@ async fn main() {
         std::process::exit(255);
     }
 
-    let _pool = match setup_database().await {
-        Ok(pool) => pool,
-        Err(err) => {
-            error!("Could not setup database: {err}");
-            std::process::exit(255);
+    let bot_state = {
+        let pool = match setup_database().await {
+            Ok(pool) => pool,
+            Err(err) => {
+                error!("Could not setup database: {err}");
+                std::process::exit(255);
+            }
+        };
+
+        BotState {
+            exchange_storage: ExchangeStorage::new(pool),
         }
     };
-
-    let bus = EventBus::<RebotSystemEvent>::new(512);
-    let _system = ActorSystem::new("rebot", bus);
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
@@ -80,7 +82,7 @@ async fn main() {
                     }
                 }
 
-                Ok(BotState {})
+                Ok(bot_state)
             })
         });
 

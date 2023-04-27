@@ -1,20 +1,23 @@
-use sqlx::FromRow;
-use time::PrimitiveDateTime;
+use sqlx::{FromRow, Type};
 
-#[repr(u32)]
-pub enum ExchangeState {
+use super::types::UtcDateTime;
+
+#[derive(Copy, Clone, Debug, Type)]
+#[repr(i32)]
+pub enum ExchangeRoundState {
     NotStartedYet,
     AcceptingSubmissions,
     WaitingToSendAssignments,
     AssignmentsSent,
 }
 
-#[derive(FromRow)]
+#[derive(FromRow, Clone, Debug)]
 pub struct ExchangeRound {
-    pub id: u32,
-    pub exchange_id: u32,
-    pub submissions_start_at: PrimitiveDateTime,
-    pub submissions_end_at: PrimitiveDateTime,
-    pub assignments_sent_at: PrimitiveDateTime,
-    pub state: ExchangeState,
+    pub id: i32,
+    pub exchange_id: i32,
+    pub submissions_start_at: UtcDateTime,
+    pub submissions_end_at: UtcDateTime,
+    pub assignments_sent_at: UtcDateTime,
+    pub games_per_member: i32,
+    pub state: ExchangeRoundState,
 }

@@ -1,11 +1,16 @@
 use poise::serenity_prelude::{ChannelId, GuildId};
-use sqlx::FromRow;
 
-#[derive(FromRow)]
+use crate::jam_types::JamType;
+
+use super::types::Sqlx;
+
+#[derive(Clone, Debug)]
 pub struct Exchange {
-    pub id: u32,
-    pub guild: GuildId,
+    pub id: i32,
+    pub guild: Sqlx<GuildId>,
+    pub jam_type: JamType,
+    pub jam_link: String,
     pub slug: String,
     pub display_name: String,
-    pub submission_channel: ChannelId,
+    pub submission_channel: Sqlx<ChannelId>,
 }
