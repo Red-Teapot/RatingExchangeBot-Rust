@@ -1,6 +1,8 @@
 #![forbid(unsafe_code)]
 #![allow(dead_code)] // TODO: Remove this before the first release.
 
+mod actors;
+mod assignment_service;
 mod commands;
 mod data;
 mod env_vars;
@@ -9,6 +11,7 @@ mod solver;
 mod storage;
 mod utils;
 
+use actors::ActorHandle;
 use log::*;
 
 use poise::serenity_prelude::{self as serenity, GuildId};
@@ -17,6 +20,7 @@ use storage::ExchangeStorage;
 
 pub struct BotState {
     pub exchange_storage: ExchangeStorage,
+    pub assignment_service: ActorHandle<assignment_service::Service>,
 }
 
 #[tokio::main]
@@ -40,8 +44,13 @@ async fn main() {
             }
         };
 
+        let (assignment_service, assignment_actor) = assignment_service::Service::new();
+
+        assignment_service.start();
+
         BotState {
             exchange_storage: ExchangeStorage::new(pool),
+            assignment_service: assignment_actor,
         }
     };
 
