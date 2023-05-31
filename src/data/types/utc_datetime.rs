@@ -1,4 +1,4 @@
-use sqlx::{Postgres, Type};
+use sqlx::{Sqlite, Type};
 use time::{OffsetDateTime, PrimitiveDateTime, UtcOffset};
 
 use super::SqlxConvertible;
@@ -26,7 +26,7 @@ impl From<UtcDateTime> for OffsetDateTime {
     }
 }
 
-impl<'q, 'r> SqlxConvertible<'q, 'r, Postgres> for UtcDateTime {
+impl<'q, 'r> SqlxConvertible<'q, 'r, Sqlite> for UtcDateTime {
     type DBType = PrimitiveDateTime;
 
     fn to_sqlx(&self) -> Self::DBType {

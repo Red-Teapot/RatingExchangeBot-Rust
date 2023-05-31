@@ -10,17 +10,27 @@ pub trait Actor {
 }
 
 pub struct ActorHandle<T: Actor> {
-    message_sender: mpsc::Sender<MessageWrap<T>>,
+    message_sender: mpsc::Sender<MessageWrap<T::Message, T::Response>>,
+}
+
+impl<T: Actor> Clone for ActorHandle<T> {
+    fn clone(&self) -> Self {
+        ActorHandle {
+            message_sender: self.message_sender.clone(),
+        }
+    }
 }
 
 impl<T: Actor> ActorHandle<T> {
-    pub fn new(message_sender: mpsc::Sender<MessageWrap<T>>) -> ActorHandle<T> {
+    pub fn new(
+        message_sender: mpsc::Sender<MessageWrap<T::Message, T::Response>>,
+    ) -> ActorHandle<T> {
         ActorHandle { message_sender }
     }
 }
 
 impl<T: Actor> ActorHandle<T> {
-    pub async fn send(&mut self, message: T::Message) -> T::Response {
+    pub async fn send(&self, message: T::Message) -> T::Response {
         let (response_sender, response_receiver) = oneshot::channel();
 
         let _ = self
@@ -35,7 +45,7 @@ impl<T: Actor> ActorHandle<T> {
     }
 }
 
-pub struct MessageWrap<T: Actor> {
-    pub message: T::Message,
-    pub respond_to: oneshot::Sender<T::Response>,
+pub struct MessageWrap<M: Send, R: Send> {
+    pub message: M,
+    pub respond_to: oneshot::Sender<R>,
 }

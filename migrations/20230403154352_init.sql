@@ -1,23 +1,23 @@
 CREATE TABLE exchanges (
-    id SERIAL PRIMARY KEY,
-    guild BIGINT NOT NULL,
-    jam_type INTEGER NOT NULL,
-    jam_link VARCHAR(64) NOT NULL,
-    slug VARCHAR(32) NOT NULL,
-    display_name VARCHAR(32) NOT NULL,
-    submission_channel BIGINT NOT NULL,
+    id INTEGER PRIMARY KEY NOT NULL,
+    guild INTEGER NOT NULL,
+    jam_type TEXT NOT NULL,
+    jam_link TEXT NOT NULL,
+    slug TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    submission_channel INTEGER NOT NULL,
 
     UNIQUE (guild, slug)
 );
 
 CREATE TABLE exchange_rounds (
-    id SERIAL PRIMARY KEY,
-    exchange_id INT NOT NULL,
-    submissions_start_at TIMESTAMP NOT NULL,
-    submissions_end_at TIMESTAMP NOT NULL,
-    assignments_sent_at TIMESTAMP NOT NULL,
-    games_per_member INTEGER NOT NULL,
-    state INT NOT NULL,
+    id INTEGER PRIMARY KEY NOT NULL,
+    exchange_id INTEGER NOT NULL,
+    submissions_start_at TEXT NOT NULL,
+    submissions_end_at TEXT NOT NULL,
+    assignments_sent_at TEXT NOT NULL,
+    games_per_member TEXT NOT NULL,
+    state TEXT NOT NULL,
 
     CONSTRAINT fk_exchange
         FOREIGN KEY (exchange_id)
@@ -26,11 +26,11 @@ CREATE TABLE exchange_rounds (
 );
 
 CREATE TABLE submissions (
-    id SERIAL PRIMARY KEY,
-    exchange_round_id INT NOT NULL,
-    link VARCHAR(64) NOT NULL,
-    submitter BIGINT NOT NULL,
-    submitted_at TIMESTAMP NOT NULL,
+    id INTEGER PRIMARY KEY NOT NULL,
+    exchange_round_id INTEGER NOT NULL,
+    link TEXT NOT NULL,
+    submitter TEXT NOT NULL,
+    submitted_at TEXT NOT NULL,
 
     CONSTRAINT fk_exchange_round
         FOREIGN KEY (exchange_round_id)
@@ -41,10 +41,10 @@ CREATE TABLE submissions (
 );
 
 CREATE TABLE played_games (
-    id SERIAL PRIMARY KEY,
-    link VARCHAR(64) NOT NULL,
-    member BIGINT NOT NULL,
-    is_manual BOOLEAN NOT NULL,
+    id INTEGER PRIMARY KEY NOT NULL,
+    link TEXT NOT NULL,
+    member INTEGER NOT NULL,
+    is_manual INTEGER NOT NULL,
 
     UNIQUE (link, member)
 );

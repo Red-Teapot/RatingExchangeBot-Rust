@@ -1,5 +1,7 @@
 use poise::serenity_prelude::{ChannelId, GuildId, UserId};
-use sqlx::{Database, Decode, Encode, Postgres, Type};
+use sqlx::{Database, Decode, Encode, Sqlite, Type};
+
+use crate::{data::ExchangeRoundState, jam_types::JamType};
 
 /// A trait that converts the types into corresponding sqlx database types.
 pub trait SqlxConvertible<'q, 'r, DB: Database> {
@@ -56,7 +58,7 @@ where
 
 // SqlxConvertible implementations for types
 
-impl SqlxConvertible<'_, '_, Postgres> for GuildId {
+impl SqlxConvertible<'_, '_, Sqlite> for GuildId {
     type DBType = i64;
 
     fn to_sqlx(&self) -> Self::DBType {
@@ -68,7 +70,7 @@ impl SqlxConvertible<'_, '_, Postgres> for GuildId {
     }
 }
 
-impl SqlxConvertible<'_, '_, Postgres> for ChannelId {
+impl SqlxConvertible<'_, '_, Sqlite> for ChannelId {
     type DBType = i64;
 
     fn to_sqlx(&self) -> Self::DBType {
@@ -80,7 +82,7 @@ impl SqlxConvertible<'_, '_, Postgres> for ChannelId {
     }
 }
 
-impl SqlxConvertible<'_, '_, Postgres> for UserId {
+impl SqlxConvertible<'_, '_, Sqlite> for UserId {
     type DBType = i64;
 
     fn to_sqlx(&self) -> Self::DBType {
@@ -89,5 +91,47 @@ impl SqlxConvertible<'_, '_, Postgres> for UserId {
 
     fn from_sqlx(value: Self::DBType) -> Self {
         UserId(value as _)
+    }
+}
+
+impl SqlxConvertible<'_, '_, Sqlite> for JamType {
+    type DBType = String;
+
+    fn to_sqlx(&self) -> Self::DBType {
+        match self {
+            JamType::Itch => "Itch".to_string(),
+            JamType::LudumDare => "LudumDare".to_string(),
+        }
+    }
+
+    fn from_sqlx(value: Self::DBType) -> Self {
+        match value.as_str() {
+            "Itch" => JamType::Itch,
+            "LudumDare" => JamType::LudumDare,
+            _ => panic!("Unexpected jam type value: {value}"),
+        }
+    }
+}
+
+impl SqlxConvertible<'_, '_, Sqlite> for ExchangeRoundState {
+    type DBType = String;
+
+    fn to_sqlx(&self) -> Self::DBType {
+        match self {
+            ExchangeRoundState::NotStartedYet => "NotStartedYet".to_string(),
+            ExchangeRoundState::AcceptingSubmissions => "AcceptingSubmissions".to_string(),
+            ExchangeRoundState::WaitingToSendAssignments => "WaitingToSendAssignments".to_string(),
+            ExchangeRoundState::AssignmentsSent => "AssignmentsSent".to_string(),
+        }
+    }
+
+    fn from_sqlx(value: Self::DBType) -> Self {
+        match value.as_str() {
+            "NotStartedYet" => ExchangeRoundState::NotStartedYet,
+            "AcceptingSubmissions" => ExchangeRoundState::AcceptingSubmissions,
+            "WaitingToSendAssignments" => ExchangeRoundState::WaitingToSendAssignments,
+            "AssignmentsSent" => ExchangeRoundState::AssignmentsSent,
+            _ => panic!("Unexpected exchange round state value: {value}"),
+        }
     }
 }

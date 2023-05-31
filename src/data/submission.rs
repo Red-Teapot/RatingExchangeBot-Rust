@@ -4,8 +4,8 @@ use time::OffsetDateTime;
 
 #[derive(FromRow)]
 pub struct Submission {
-    pub id: Option<u32>,
-    pub exchange_round_id: Option<u32>,
+    pub id: i64,
+    pub exchange_round_id: i64,
     pub link: String,
     pub submitter: UserId,
     pub submitted_at: OffsetDateTime,

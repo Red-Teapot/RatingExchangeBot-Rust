@@ -11,16 +11,17 @@ mod solver;
 mod storage;
 mod utils;
 
-use actors::ActorHandle;
+use std::sync::Arc;
+
+use assignment_service::AssignmentService;
 use log::*;
 
 use poise::serenity_prelude::{self as serenity, GuildId};
-use sqlx::{postgres::PgPoolOptions, PgPool};
+use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
 use storage::ExchangeStorage;
 
 pub struct BotState {
-    pub exchange_storage: ExchangeStorage,
-    pub assignment_service: ActorHandle<assignment_service::Service>,
+    pub exchange_storage: Arc<ExchangeStorage>,
 }
 
 #[tokio::main]
@@ -44,13 +45,8 @@ async fn main() {
             }
         };
 
-        let (assignment_service, assignment_actor) = assignment_service::Service::new();
-
-        assignment_service.start();
-
         BotState {
-            exchange_storage: ExchangeStorage::new(pool),
-            assignment_service: assignment_actor,
+            exchange_storage: Arc::new(ExchangeStorage::new(pool)),
         }
     };
 
@@ -91,6 +87,8 @@ async fn main() {
                     }
                 }
 
+                AssignmentService::create_and_start(bot_state.exchange_storage.clone());
+
                 Ok(bot_state)
             })
         });
@@ -98,8 +96,8 @@ async fn main() {
     framework.run().await.unwrap();
 }
 
-async fn setup_database() -> anyhow::Result<PgPool> {
-    let pool = PgPoolOptions::new()
+async fn setup_database() -> anyhow::Result<SqlitePool> {
+    let pool = SqlitePoolOptions::new()
         .connect(&env_vars::DATABASE_URL.required())
         .await?;
     sqlx::migrate!("./migrations").run(&pool).await?;

@@ -1,77 +1,69 @@
-use async_trait::async_trait;
-use log::warn;
+use std::{sync::Arc, thread, time::Duration};
+
+use log::{error, info};
 use time::OffsetDateTime;
-use tokio::{select, sync::mpsc};
+use tokio::{runtime::Handle, select};
 
-use crate::actors::{Actor, ActorHandle, MessageWrap};
+use crate::storage::{ExchangeStorage, ExchangeStorageEvent};
 
-pub struct Service {
+pub struct AssignmentService {
     next_assignments_time: Option<OffsetDateTime>,
-    message_receiver: mpsc::Receiver<MessageWrap<Service>>,
+    exchange_storage: Arc<ExchangeStorage>,
 }
 
-impl Service {
-    pub fn new() -> (Service, ActorHandle<Service>) {
-        let (sender, receiver) = mpsc::channel(128);
-
-        let service = Service {
+impl AssignmentService {
+    pub fn create_and_start(exchange_storage: Arc<ExchangeStorage>) {
+        let service = AssignmentService {
             next_assignments_time: None,
-            message_receiver: receiver,
+            exchange_storage,
         };
 
-        let handle = ActorHandle::new(sender);
-
-        (service, handle)
+        service.start();
     }
 
-    pub fn start(mut self) {
-        tokio::spawn(async move {
-            loop {
-                let sleep_duration = self.next_assignments_time.map(|time| {
-                    let duration_raw = time - OffsetDateTime::now_utc();
-                    std::time::Duration::from_millis(
-                        duration_raw.whole_milliseconds().try_into().unwrap(),
-                    )
-                });
+    fn start(mut self) {
+        // Make sure it's on a separate thread due to possible heavy computations.
+        let rt_handle = Handle::current();
+        thread::spawn(move || {
+            rt_handle.block_on(async move {
+                self.reschedule().await;
 
-                select! {
-                    _ = tokio::time::sleep(sleep_duration.unwrap()), if sleep_duration.is_some() => {
-                        self.perform_assignments().await;
-                        self.reschedule().await;
-                    }
+                let mut exchange_events = self.exchange_storage.subscribe();
 
-                    Some(MessageWrap { message, respond_to }) = self.message_receiver.recv() => {
-                        #[allow(clippy::unit_arg)]
-                        match respond_to.send(self.handle_message(&message).await) {
-                            Ok(_) => (),
-                            Err(response) => warn!("Could not respond to a message. Message: {:?}, response: {:?}", message, response),
+                loop {
+                    let sleep_duration = self
+                        .next_assignments_time
+                        .map(|time| {
+                            let duration_raw = time - OffsetDateTime::now_utc();
+                            std::time::Duration::from_millis(
+                                duration_raw.whole_milliseconds().try_into().unwrap(),
+                            )
+                        })
+                        .unwrap_or(Duration::from_secs(60 * 60));
+
+                    select! {
+                        _ = tokio::time::sleep(sleep_duration) => {
+                            self.perform_assignments().await;
+                            self.reschedule().await;
+                        }
+
+                        evt = exchange_events.recv() => {
+                            match evt {
+                                Ok(ExchangeStorageEvent::ExchangesUpdated) => self.reschedule().await,
+                                Err(err) => error!("Error while receiving an exchange event: {err:?}"),
+                            }
                         }
                     }
                 }
-            }
+            });
         });
     }
 
-    async fn perform_assignments(&mut self) {}
+    async fn perform_assignments(&mut self) {
+        info!("Performing assignments");
+    }
 
-    async fn reschedule(&mut self) {}
-}
-
-#[derive(Debug)]
-pub enum Message {
-    Reschedule,
-    PerformAssignments,
-}
-
-#[async_trait]
-impl Actor for Service {
-    type Message = Message;
-    type Response = ();
-
-    async fn handle_message(&mut self, message: &Self::Message) -> Self::Response {
-        match message {
-            Message::Reschedule => self.reschedule().await,
-            Message::PerformAssignments => self.perform_assignments().await,
-        }
+    async fn reschedule(&mut self) {
+        info!("Rescheduling");
     }
 }

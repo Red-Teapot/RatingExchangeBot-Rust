@@ -9,6 +9,7 @@ use time::{Duration, OffsetDateTime};
 use crate::{
     commands::{arguments::*, camel_slug::slugify_camel, *},
     jam_types::JamType,
+    storage::CreateExchange,
     utils::{timestamp, TimestampStyle},
 };
 
@@ -116,19 +117,19 @@ pub async fn exchange_create(
     let (exchange, rounds) = ctx
         .data
         .exchange_storage
-        .create_exchange(
-            ctx.guild_id().unwrap(),
+        .create_exchange(CreateExchange {
+            guild_id: ctx.guild_id().unwrap(),
             jam_type,
             jam_link,
-            slug.to_string(),
-            display_name.to_string(),
-            submission_channel.id,
-            rounds,
-            start,
+            slug: slug.to_string(),
+            display_name: display_name.to_string(),
+            submission_channel: submission_channel.id,
+            num_rounds: rounds,
+            first_round_start: start,
             submission_duration,
             round_duration,
             games_per_member,
-        )
+        })
         .await
         .unwrap();
 
@@ -159,7 +160,7 @@ pub async fn exchange_create(
                     exchange.submission_channel.0.mention(),
                     true,
                 )
-                .field("Jam type", exchange.jam_type.name(), true)
+                .field("Jam type", exchange.jam_type.0.name(), true)
                 .field("Jam link", exchange.jam_link, true)
                 .field("Rounds", rounds_str.trim(), false)
         })

@@ -6,9 +6,9 @@ use super::types::Sqlx;
 
 #[derive(Clone, Debug)]
 pub struct Exchange {
-    pub id: i32,
+    pub id: i64,
     pub guild: Sqlx<GuildId>,
-    pub jam_type: JamType,
+    pub jam_type: Sqlx<JamType>,
     pub jam_link: String,
     pub slug: String,
     pub display_name: String,

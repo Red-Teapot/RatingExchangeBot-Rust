@@ -2,6 +2,8 @@ use lazy_regex::regex_captures;
 use poise::ChoiceParameter;
 use sqlx::Type;
 
+use crate::data::types::Sqlx;
+
 #[derive(ChoiceParameter, Copy, Clone, Debug, Type)]
 #[repr(i32)]
 pub enum JamType {
@@ -9,6 +11,12 @@ pub enum JamType {
     Itch,
     #[name = "Ludum Dare"]
     LudumDare,
+}
+
+impl From<Sqlx<JamType>> for JamType {
+    fn from(value: Sqlx<JamType>) -> Self {
+        value.0
+    }
 }
 
 impl JamType {
