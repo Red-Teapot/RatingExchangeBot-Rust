@@ -7,6 +7,7 @@ mod commands;
 mod data;
 mod env_vars;
 mod jam_types;
+mod poise_error_handler;
 mod solver;
 mod storage;
 mod utils;
@@ -17,6 +18,7 @@ use assignment_service::AssignmentService;
 use log::*;
 
 use poise::serenity_prelude::{self as serenity, GuildId};
+use poise_error_handler::handle_error;
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
 use storage::ExchangeStorage;
 
@@ -53,6 +55,11 @@ async fn main() {
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: vec![commands::reb()],
+            on_error: |error| {
+                Box::pin(async move {
+                    handle_error(error).await;
+                })
+            },
             ..Default::default()
         })
         .token(env_vars::DISCORD_BOT_TOKEN.required())
