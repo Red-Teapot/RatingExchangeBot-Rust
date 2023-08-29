@@ -1,5 +1,3 @@
-use log::error;
-
 pub const DISCORD_BOT_TOKEN: EnvVar = EnvVar {
     name: "DISCORD_BOT_TOKEN",
     validator: non_empty_string,
@@ -17,9 +15,17 @@ pub const REGISTER_COMMANDS_IN_GUILDS: EnvVar = EnvVar {
     name: "REGISTER_COMMANDS_IN_GUILDS",
     validator: uint_list,
 };
+pub const SENTRY_URL: EnvVar = EnvVar {
+    name: "SENTRY_URL",
+    validator: non_empty_string,
+};
 
 const REQUIRED_VARS: &[EnvVar] = &[DISCORD_BOT_TOKEN, DATABASE_URL];
-const OPTIONAL_VARS: &[EnvVar] = &[REGISTER_COMMANDS_GLOBALLY, REGISTER_COMMANDS_IN_GUILDS];
+const OPTIONAL_VARS: &[EnvVar] = &[
+    REGISTER_COMMANDS_GLOBALLY,
+    REGISTER_COMMANDS_IN_GUILDS,
+    SENTRY_URL,
+];
 
 fn non_empty_string(string: &str) -> bool {
     !string.trim().is_empty()
@@ -43,12 +49,12 @@ pub fn check() -> bool {
 
     for var in REQUIRED_VARS {
         if !envmnt::exists(var.name) {
-            error!("Environment variable {} must be set!", var.name);
+            eprintln!("Environment variable {} must be set!", var.name);
             passed = false
         } else {
             let value = var.required();
             if !(var.validator)(&value) {
-                error!("Environment variable {} has an incorrect value!", var.name);
+                eprintln!("Environment variable {} has an incorrect value!", var.name);
                 passed = false;
             }
         }
@@ -57,7 +63,7 @@ pub fn check() -> bool {
     for var in OPTIONAL_VARS {
         if let Some(value) = var.option() {
             if !(var.validator)(&value) {
-                error!("Environment variable {} has an incorrect value!", var.name);
+                eprintln!("Environment variable {} has an incorrect value!", var.name);
                 passed = false;
             }
         }

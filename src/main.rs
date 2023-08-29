@@ -15,28 +15,55 @@ mod utils;
 use std::sync::Arc;
 
 use assignment_service::AssignmentService;
-use log::*;
 
 use poise::serenity_prelude::{self as serenity, GuildId};
 use poise_error_handler::handle_error;
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
 use storage::ExchangeStorage;
+use tracing::{error, info};
+use tracing_subscriber::prelude::*;
 
+#[derive(Debug)]
 pub struct BotState {
     pub exchange_storage: Arc<ExchangeStorage>,
 }
 
+#[tracing::instrument]
 #[tokio::main]
 async fn main() {
-    env_logger::init();
-
     if let Err(err) = envmnt::load_file(".env") {
-        warn!("Could not load .env file: {err}");
+        eprintln!("Could not load .env file: {err}");
     }
 
     if !env_vars::check() {
+        eprintln!("Failed to check environment variable values");
         std::process::exit(255);
     }
+
+    let _sentry_guard = if let Some(url) = env_vars::SENTRY_URL.option() {
+        let guard = Some(sentry::init((
+            url.as_str(),
+            sentry::ClientOptions {
+                release: sentry::release_name!(),
+                traces_sample_rate: 1.0,
+                ..Default::default()
+            },
+        )));
+
+        tracing_subscriber::registry()
+            .with(tracing_subscriber::fmt::layer())
+            .with(sentry_tracing::layer())
+            .with(tracing_subscriber::EnvFilter::from_default_env())
+            .init();
+
+        guard
+    } else {
+        tracing_subscriber::registry()
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+
+        None
+    };
 
     let bot_state = {
         let pool = match setup_database().await {

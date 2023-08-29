@@ -1,7 +1,7 @@
 use poise::{Context, FrameworkError};
+use tracing::{error, warn};
 
 use crate::{commands::CommandError, BotState};
-use log::{error, warn};
 
 pub async fn handle_error(error: poise::FrameworkError<'_, BotState, CommandError>) {
     use FrameworkError::*;

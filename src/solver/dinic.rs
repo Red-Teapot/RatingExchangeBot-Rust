@@ -1,4 +1,4 @@
-use log::*;
+use tracing::{trace, warn};
 
 use crate::solver::flow_network::{Edge, FlowNetwork, Id};
 use std::collections::{HashMap, HashSet, LinkedList};
@@ -17,9 +17,7 @@ pub fn solve(network: &mut FlowNetwork) {
     loop {
         construct_residual_graph(network, &mut residual_graph);
 
-        if log_enabled!(log::Level::Trace) {
-            trace!("Residual graph:\n{residual_graph:?}");
-        }
+        trace!("Residual graph:\n{residual_graph:?}");
 
         construct_level_graph(
             &residual_graph,
@@ -29,18 +27,14 @@ pub fn solve(network: &mut FlowNetwork) {
             &mut visited,
         );
 
-        if log_enabled!(log::Level::Trace) {
-            trace!("Level graph:\n{level_graph:?}");
-            trace!("Vertex levels:\n{vertex_levels:?}");
-        }
+        trace!("Level graph:\n{level_graph:?}");
+        trace!("Vertex levels:\n{vertex_levels:?}");
 
         let has_blocking_flow =
             find_blocking_flow(&mut level_graph, &mut worklist, &mut visited, &mut path);
 
-        if log_enabled!(log::Level::Trace) {
-            trace!("Has blocking flow: {}", has_blocking_flow);
-            trace!("Level graph with blocking flow:\n{level_graph:?}");
-        }
+        trace!("Has blocking flow: {}", has_blocking_flow);
+        trace!("Level graph with blocking flow:\n{level_graph:?}");
 
         if !has_blocking_flow {
             break;
@@ -63,9 +57,7 @@ pub fn solve(network: &mut FlowNetwork) {
             }
         }
 
-        if log_enabled!(log::Level::Trace) {
-            trace!("Network after flow adjustment:\n{network:?}");
-        }
+        trace!("Network after flow adjustment:\n{network:?}");
     }
 }
 
@@ -211,9 +203,8 @@ fn find_blocking_flow(
 
 #[cfg(test)]
 mod tests {
-    use test_log::test;
-
     use std::collections::{HashMap, HashSet, LinkedList};
+    use test_log::test;
 
     use map_macro::map;
 

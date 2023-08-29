@@ -1,8 +1,8 @@
 use std::{sync::Arc, thread, time::Duration};
 
-use log::{error, info};
 use time::OffsetDateTime;
 use tokio::{runtime::Handle, select};
+use tracing::{error, info};
 
 use crate::storage::{ExchangeStorage, ExchangeStorageEvent};
 

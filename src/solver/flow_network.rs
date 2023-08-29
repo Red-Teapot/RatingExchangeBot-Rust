@@ -248,9 +248,8 @@ impl Debug for FlowNetwork {
 
 #[cfg(test)]
 mod tests {
-    use test_log::test;
-
     use std::collections::{HashMap, HashSet};
+    use test_log::test;
 
     use map_macro::{map, set};
 

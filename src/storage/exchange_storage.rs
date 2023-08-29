@@ -11,6 +11,7 @@ use crate::{
     jam_types::JamType,
 };
 
+#[derive(Debug)]
 pub struct ExchangeStorage {
     pool: Pool<Sqlite>,
     events: Sender<ExchangeStorageEvent>,
