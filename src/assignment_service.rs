@@ -2,7 +2,7 @@ use std::{sync::Arc, thread, time::Duration};
 
 use time::OffsetDateTime;
 use tokio::{runtime::Handle, select};
-use tracing::{error, info};
+use tracing::{error, info, info_span, Instrument};
 
 use crate::storage::{ExchangeStorage, ExchangeStorageEvent};
 
@@ -55,14 +55,16 @@ impl AssignmentService {
                         }
                     }
                 }
-            });
+            }.instrument(info_span!("main_loop")));
         });
     }
 
+    #[tracing::instrument(skip(self))]
     async fn perform_assignments(&mut self) {
         info!("Performing assignments");
     }
 
+    #[tracing::instrument(skip(self))]
     async fn reschedule(&mut self) {
         info!("Rescheduling");
     }

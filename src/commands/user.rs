@@ -21,7 +21,7 @@ pub async fn help(
 }
 
 /// Submit your game to the active review exchange.
-#[tracing::instrument]
+#[tracing::instrument(skip(ctx))]
 #[poise::command(slash_command, ephemeral)]
 pub async fn submit(
     ctx: Context<'_>,
@@ -32,7 +32,7 @@ pub async fn submit(
 ) -> CommandResult {
     tracing::info!("I'm about to fail");
     ctx.say("Submitting games is not implemented yet").await?;
-    // tracing::error!("Something something not implemented something");
+    tracing::error!("Something something not implemented something");
     Ok(())
 }
 

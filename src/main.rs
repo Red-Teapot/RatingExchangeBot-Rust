@@ -20,7 +20,7 @@ use poise::serenity_prelude::{self as serenity, GuildId};
 use poise_error_handler::handle_error;
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
 use storage::ExchangeStorage;
-use tracing::{error, info};
+use tracing::{error, info, info_span, Instrument};
 use tracing_subscriber::prelude::*;
 
 #[derive(Debug)]
@@ -60,6 +60,7 @@ async fn main() {
     } else {
         tracing_subscriber::registry()
             .with(tracing_subscriber::fmt::layer())
+            .with(tracing_subscriber::EnvFilter::from_default_env())
             .init();
 
         None
@@ -92,39 +93,43 @@ async fn main() {
         .token(env_vars::DISCORD_BOT_TOKEN.required())
         .intents(serenity::GatewayIntents::GUILD_MESSAGES)
         .setup(|ctx, _ready, framework| {
-            Box::pin(async move {
-                let commands = &framework.options().commands;
+            Box::pin(
+                async move {
+                    let commands = &framework.options().commands;
 
-                if env_vars::REGISTER_COMMANDS_GLOBALLY.get_bool(false) {
-                    info!("Registering commands globally");
-                    poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                }
-
-                if let Some(guilds_str) = env_vars::REGISTER_COMMANDS_IN_GUILDS.option() {
-                    let guilds = guilds_str
-                        .split(',')
-                        .map(|s| s.trim())
-                        .map(|s| s.parse::<u64>().unwrap())
-                        .map(GuildId);
-
-                    for guild in guilds {
-                        let guild_name = ctx
-                            .http
-                            .get_guild(guild.0)
-                            .await
-                            .map(|g| g.name)
-                            .unwrap_or("???".to_string());
-
-                        info!("Registering commands in guild {guild} ({guild_name})");
-
-                        poise::builtins::register_in_guild(ctx, commands, guild).await?;
+                    if env_vars::REGISTER_COMMANDS_GLOBALLY.get_bool(false) {
+                        info!("Registering commands globally");
+                        poise::builtins::register_globally(ctx, &framework.options().commands)
+                            .await?;
                     }
+
+                    if let Some(guilds_str) = env_vars::REGISTER_COMMANDS_IN_GUILDS.option() {
+                        let guilds = guilds_str
+                            .split(',')
+                            .map(|s| s.trim())
+                            .map(|s| s.parse::<u64>().unwrap())
+                            .map(GuildId);
+
+                        for guild in guilds {
+                            let guild_name = ctx
+                                .http
+                                .get_guild(guild.0)
+                                .await
+                                .map(|g| g.name)
+                                .unwrap_or("???".to_string());
+
+                            info!("Registering commands in guild {guild} ({guild_name})");
+
+                            poise::builtins::register_in_guild(ctx, commands, guild).await?;
+                        }
+                    }
+
+                    AssignmentService::create_and_start(bot_state.exchange_storage.clone());
+
+                    Ok(bot_state)
                 }
-
-                AssignmentService::create_and_start(bot_state.exchange_storage.clone());
-
-                Ok(bot_state)
-            })
+                .instrument(info_span!("bot_setup")),
+            )
         });
 
     framework.run().await.unwrap();
