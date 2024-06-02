@@ -1,6 +1,6 @@
-use std::{ops::Add, str::FromStr};
+use std::{str::FromStr};
 
-use anyhow::anyhow;
+
 use poise::serenity_prelude::{ButtonStyle, Channel, Mentionable};
 use serenity::{builder::CreateEmbed, utils::Color};
 use time::{format_description, macros::format_description, Duration, OffsetDateTime};

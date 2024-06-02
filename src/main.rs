@@ -19,8 +19,8 @@ use poise_error_handler::handle_error;
 use repository::ExchangeRepository;
 use serde::Deserialize;
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
-use tracing::{error, info, info_span, level_filters::LevelFilter, warn, Instrument};
-use tracing_subscriber::{filter::Directive, prelude::*};
+use tracing::{error, info, info_span, warn, Instrument};
+use tracing_subscriber::{prelude::*};
 
 #[derive(Debug, Deserialize)]
 struct AppConfig {
