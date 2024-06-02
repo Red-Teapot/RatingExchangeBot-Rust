@@ -1,73 +1,70 @@
 #![forbid(unsafe_code)]
 #![allow(dead_code)] // TODO: Remove this before the first release.
 
-mod actors;
 mod assignment_service;
 mod commands;
-mod data;
-mod env_vars;
 mod jam_types;
+mod models;
 mod poise_error_handler;
+mod repository;
 mod solver;
-mod storage;
 mod utils;
 
-use std::sync::Arc;
+use std::{process::exit, sync::Arc};
 
 use assignment_service::AssignmentService;
 
 use poise::serenity_prelude::{self as serenity, GuildId};
 use poise_error_handler::handle_error;
+use repository::ExchangeRepository;
+use serde::Deserialize;
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
-use storage::ExchangeStorage;
-use tracing::{error, info, info_span, Instrument};
-use tracing_subscriber::prelude::*;
+use tracing::{error, info, info_span, level_filters::LevelFilter, warn, Instrument};
+use tracing_subscriber::{filter::Directive, prelude::*};
+
+#[derive(Debug, Deserialize)]
+struct AppConfig {
+    discord_bot_token: String,
+    database_url: String,
+    register_commands_globally: Option<bool>,
+    register_commands_in_guilds: Option<Vec<u64>>,
+}
 
 #[derive(Debug)]
 pub struct BotState {
-    pub exchange_storage: Arc<ExchangeStorage>,
+    pub exchange_storage: Arc<ExchangeRepository>,
 }
 
 #[tracing::instrument]
 #[tokio::main]
 async fn main() {
-    if let Err(err) = envmnt::load_file(".env") {
-        eprintln!("Could not load .env file: {err}");
+    if let Err(err) = dotenvy::dotenv() {
+        warn!("Could not load config from .env file: {err}");
     }
 
-    if !env_vars::check() {
-        eprintln!("Failed to check environment variable values");
-        std::process::exit(255);
-    }
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(
+            tracing_subscriber::EnvFilter::builder()
+                .with_default_directive(
+                    "rating_exchange_bot=info"
+                        .parse()
+                        .expect("Hard-coded default directive should be correct"),
+                )
+                .from_env_lossy(),
+        )
+        .init();
 
-    let _sentry_guard = if let Some(url) = env_vars::SENTRY_URL.option() {
-        let guard = Some(sentry::init((
-            url.as_str(),
-            sentry::ClientOptions {
-                release: sentry::release_name!(),
-                traces_sample_rate: 1.0,
-                ..Default::default()
-            },
-        )));
-
-        tracing_subscriber::registry()
-            .with(tracing_subscriber::fmt::layer())
-            .with(sentry_tracing::layer())
-            .with(tracing_subscriber::EnvFilter::from_default_env())
-            .init();
-
-        guard
-    } else {
-        tracing_subscriber::registry()
-            .with(tracing_subscriber::fmt::layer())
-            .with(tracing_subscriber::EnvFilter::from_default_env())
-            .init();
-
-        None
+    let app_config = match envy::from_env::<AppConfig>() {
+        Ok(config) => config,
+        Err(err) => {
+            error!("Could not load app config: {err}");
+            exit(255);
+        }
     };
 
-    let bot_state = {
-        let pool = match setup_database().await {
+    let app_state = {
+        let pool = match setup_database(&app_config.database_url).await {
             Ok(pool) => pool,
             Err(err) => {
                 error!("Could not setup database: {err}");
@@ -76,13 +73,13 @@ async fn main() {
         };
 
         BotState {
-            exchange_storage: Arc::new(ExchangeStorage::new(pool)),
+            exchange_storage: Arc::new(ExchangeRepository::new(pool)),
         }
     };
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![commands::reb()],
+            commands: vec![commands::exchange()],
             on_error: |error| {
                 Box::pin(async move {
                     handle_error(error).await;
@@ -90,27 +87,21 @@ async fn main() {
             },
             ..Default::default()
         })
-        .token(env_vars::DISCORD_BOT_TOKEN.required())
+        .token(app_config.discord_bot_token)
         .intents(serenity::GatewayIntents::GUILD_MESSAGES)
-        .setup(|ctx, _ready, framework| {
+        .setup(move |ctx, _ready, framework| {
             Box::pin(
                 async move {
                     let commands = &framework.options().commands;
 
-                    if env_vars::REGISTER_COMMANDS_GLOBALLY.get_bool(false) {
+                    if let Some(true) = app_config.register_commands_globally {
                         info!("Registering commands globally");
                         poise::builtins::register_globally(ctx, &framework.options().commands)
                             .await?;
                     }
 
-                    if let Some(guilds_str) = env_vars::REGISTER_COMMANDS_IN_GUILDS.option() {
-                        let guilds = guilds_str
-                            .split(',')
-                            .map(|s| s.trim())
-                            .map(|s| s.parse::<u64>().unwrap())
-                            .map(GuildId);
-
-                        for guild in guilds {
+                    if let Some(guilds) = app_config.register_commands_in_guilds {
+                        for guild in guilds.iter().map(|g| GuildId(*g)) {
                             let guild_name = ctx
                                 .http
                                 .get_guild(guild.0)
@@ -124,9 +115,9 @@ async fn main() {
                         }
                     }
 
-                    AssignmentService::create_and_start(bot_state.exchange_storage.clone());
+                    AssignmentService::create_and_start(app_state.exchange_storage.clone());
 
-                    Ok(bot_state)
+                    Ok(app_state)
                 }
                 .instrument(info_span!("bot_setup")),
             )
@@ -135,10 +126,12 @@ async fn main() {
     framework.run().await.unwrap();
 }
 
-async fn setup_database() -> anyhow::Result<SqlitePool> {
-    let pool = SqlitePoolOptions::new()
-        .connect(&env_vars::DATABASE_URL.required())
-        .await?;
+#[tracing::instrument(skip(url))]
+async fn setup_database(url: &str) -> anyhow::Result<SqlitePool> {
+    info!("Connecting to SQLite database at {url}");
+    let pool = SqlitePoolOptions::new().connect(url).await?;
+    info!("Running migrations");
     sqlx::migrate!("./migrations").run(&pool).await?;
+    info!("Done!");
     Ok(pool)
 }

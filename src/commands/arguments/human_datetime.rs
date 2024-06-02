@@ -5,11 +5,13 @@ use time::{Date, Duration, Month, OffsetDateTime, Time, UtcOffset};
 
 use crate::commands::CommandError;
 
+use super::super::user_err;
+
 const EXAMPLE_1: &str = "2023-06-24 15:33:40 UTC+7";
 const EXAMPLE_2: &str = "15:33 UTC";
 
 fn invalid_argument(message: String) -> CommandError {
-    super::invalid_argument(format!(
+    user_err(&format!(
         "{message}\nDatetime examples: `{EXAMPLE_1}`, `{EXAMPLE_2}`."
     ))
 }

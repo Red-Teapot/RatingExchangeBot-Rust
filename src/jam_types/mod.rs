@@ -2,7 +2,7 @@ use lazy_regex::regex_captures;
 use poise::ChoiceParameter;
 use sqlx::Type;
 
-use crate::data::types::Sqlx;
+use crate::models::types::Sqlx;
 
 #[derive(ChoiceParameter, Copy, Clone, Debug, Type)]
 #[repr(i32)]

@@ -2,7 +2,7 @@ use std::{fmt::Display, str::FromStr};
 
 use crate::commands::CommandError;
 
-use super::invalid_argument;
+use super::super::user_err;
 
 pub struct ExchangeSlug(String);
 
@@ -19,7 +19,7 @@ impl FromStr for ExchangeSlug {
         if is_valid {
             Ok(ExchangeSlug(s.to_string()))
         } else {
-            Err(invalid_argument(format!("Invalid exchange slug: `{}`.\nIt can only contain a-z, A-Z, 0-9, a dash (-) or an underscore (_).", s.escape_default())))
+            Err(user_err(&format!("Invalid exchange slug: `{}`.\nIt can only contain a-z, A-Z, 0-9, a dash (-) or an underscore (_).", s.escape_default())))
         }
     }
 }

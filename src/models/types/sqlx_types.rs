@@ -1,7 +1,7 @@
 use poise::serenity_prelude::{ChannelId, GuildId, UserId};
 use sqlx::{Database, Decode, Encode, Sqlite, Type};
 
-use crate::{data::ExchangeRoundState, jam_types::JamType};
+use crate::{jam_types::JamType, models::ExchangeState};
 
 /// A trait that converts the types into corresponding sqlx database types.
 pub trait SqlxConvertible<'q, 'r, DB: Database> {
@@ -113,24 +113,26 @@ impl SqlxConvertible<'_, '_, Sqlite> for JamType {
     }
 }
 
-impl SqlxConvertible<'_, '_, Sqlite> for ExchangeRoundState {
+impl SqlxConvertible<'_, '_, Sqlite> for ExchangeState {
     type DBType = String;
 
     fn to_sqlx(&self) -> Self::DBType {
+        use ExchangeState::*;
+
         match self {
-            ExchangeRoundState::NotStartedYet => "NotStartedYet".to_string(),
-            ExchangeRoundState::AcceptingSubmissions => "AcceptingSubmissions".to_string(),
-            ExchangeRoundState::WaitingToSendAssignments => "WaitingToSendAssignments".to_string(),
-            ExchangeRoundState::AssignmentsSent => "AssignmentsSent".to_string(),
+            NotStartedYet => "NotStartedYet".to_string(),
+            AcceptingSubmissions => "AcceptingSubmissions".to_string(),
+            AssignmentsSent => "AssignmentsSent".to_string(),
         }
     }
 
     fn from_sqlx(value: Self::DBType) -> Self {
+        use ExchangeState::*;
+
         match value.as_str() {
-            "NotStartedYet" => ExchangeRoundState::NotStartedYet,
-            "AcceptingSubmissions" => ExchangeRoundState::AcceptingSubmissions,
-            "WaitingToSendAssignments" => ExchangeRoundState::WaitingToSendAssignments,
-            "AssignmentsSent" => ExchangeRoundState::AssignmentsSent,
+            "NotStartedYet" => NotStartedYet,
+            "AcceptingSubmissions" => AcceptingSubmissions,
+            "AssignmentsSent" => AssignmentsSent,
             _ => panic!("Unexpected exchange round state value: {value}"),
         }
     }

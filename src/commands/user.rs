@@ -2,7 +2,7 @@ use poise::samples::HelpConfiguration;
 
 use crate::commands::*;
 
-/// Provide help for available bot commands.
+/// Get help for available bot commands.
 #[poise::command(slash_command, ephemeral)]
 pub async fn help(
     ctx: Context<'_>,

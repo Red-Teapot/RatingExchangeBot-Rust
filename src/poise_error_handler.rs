@@ -16,18 +16,18 @@ pub async fn handle_error(error: poise::FrameworkError<'_, BotState, CommandErro
         }
 
         Command { error, ctx } => match error {
-            CommandError::InvalidArgument { message } => {
+            CommandError::UserError { message } => {
                 reply_with_error(ctx, &message).await;
+            }
+
+            CommandError::InternalError { message } => {
+                reply_with_internal_error(ctx, &message).await;
+                error!("Internal error: {}", message);
             }
 
             CommandError::SerenityError(error) => {
                 reply_with_internal_error(ctx, &error.to_string()).await;
                 error!("Serenity error: {}", error);
-            }
-
-            CommandError::Other(error) => {
-                reply_with_internal_error(ctx, &error.to_string()).await;
-                error!("Other command error: {}", error);
             }
         },
 

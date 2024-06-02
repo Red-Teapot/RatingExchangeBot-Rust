@@ -4,11 +4,13 @@ use time::Duration;
 
 use crate::commands::CommandError;
 
+use super::super::user_err;
+
 const EXAMPLE_1: &str = "1 day 3 hours 2 minutes 59 seconds";
 const EXAMPLE_2: &str = "1d 3h 2m 59s";
 
 fn invalid_argument(message: String) -> CommandError {
-    super::invalid_argument(format!(
+    user_err(&format!(
         "{message}\nDuration examples: `{EXAMPLE_1}`, `{EXAMPLE_2}`."
     ))
 }

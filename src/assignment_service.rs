@@ -4,15 +4,15 @@ use time::OffsetDateTime;
 use tokio::{runtime::Handle, select};
 use tracing::{error, info, info_span, Instrument};
 
-use crate::storage::{ExchangeStorage, ExchangeStorageEvent};
+use crate::repository::{ExchangeRepository, ExchangeStorageEvent};
 
 pub struct AssignmentService {
     next_assignments_time: Option<OffsetDateTime>,
-    exchange_storage: Arc<ExchangeStorage>,
+    exchange_storage: Arc<ExchangeRepository>,
 }
 
 impl AssignmentService {
-    pub fn create_and_start(exchange_storage: Arc<ExchangeStorage>) {
+    pub fn create_and_start(exchange_storage: Arc<ExchangeRepository>) {
         let service = AssignmentService {
             next_assignments_time: None,
             exchange_storage,
