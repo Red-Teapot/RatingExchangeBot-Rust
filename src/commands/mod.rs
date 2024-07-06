@@ -2,11 +2,13 @@ mod camel_slug;
 
 mod arguments;
 mod exchange;
+mod submit;
 mod user;
 
 use crate::BotState;
 
 pub use exchange::exchange;
+pub use submit::submit;
 
 type CommandResult = Result<(), CommandError>;
 type Context<'a> = poise::Context<'a, BotState, CommandError>;
@@ -22,14 +24,14 @@ pub enum CommandError {
     SerenityError(#[from] serenity::Error),
 }
 
-fn user_err(message: &str) -> CommandError {
+fn user_err(message: impl Into<String>) -> CommandError {
     CommandError::UserError {
-        message: message.to_string(),
+        message: message.into(),
     }
 }
 
-fn internal_err(message: &str) -> CommandError {
+fn internal_err(message: impl Into<String>) -> CommandError {
     CommandError::InternalError {
-        message: message.to_string(),
+        message: message.into(),
     }
 }

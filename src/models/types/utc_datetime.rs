@@ -1,8 +1,6 @@
-use sqlx::{Sqlite, Type};
+use sqlx::Type;
 use std::ops::Add;
 use time::{Duration, OffsetDateTime, PrimitiveDateTime, UtcOffset};
-
-use super::SqlxConvertible;
 
 #[derive(Copy, Clone, Debug, Type)]
 #[sqlx(transparent)]
@@ -32,17 +30,5 @@ impl Add<Duration> for UtcDateTime {
 
     fn add(self, rhs: Duration) -> Self::Output {
         UtcDateTime(self.0 + rhs)
-    }
-}
-
-impl<'q, 'r> SqlxConvertible<'q, 'r, Sqlite> for UtcDateTime {
-    type DBType = PrimitiveDateTime;
-
-    fn to_sqlx(&self) -> Self::DBType {
-        self.0
-    }
-
-    fn from_sqlx(value: Self::DBType) -> Self {
-        UtcDateTime(value)
     }
 }

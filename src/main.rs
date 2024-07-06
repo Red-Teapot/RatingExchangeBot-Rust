@@ -16,11 +16,11 @@ use assignment_service::AssignmentService;
 
 use poise::serenity_prelude::{self as serenity, GuildId};
 use poise_error_handler::handle_error;
-use repository::ExchangeRepository;
+use repository::{ExchangeRepository, PlayedGameRepository, SubmissionRepository};
 use serde::Deserialize;
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
 use tracing::{error, info, info_span, warn, Instrument};
-use tracing_subscriber::{prelude::*};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Debug, Deserialize)]
 struct AppConfig {
@@ -30,10 +30,13 @@ struct AppConfig {
     register_commands_in_guilds: Option<Vec<u64>>,
 }
 
-#[derive(Debug)]
 pub struct BotState {
-    pub exchange_storage: Arc<ExchangeRepository>,
+    pub exchange_repository: Arc<ExchangeRepository>,
+    pub submission_repository: Arc<SubmissionRepository>,
+    pub played_game_repository: Arc<PlayedGameRepository>,
 }
+
+rust_i18n::i18n!("locales");
 
 #[tracing::instrument]
 #[tokio::main]
@@ -63,6 +66,8 @@ async fn main() {
         }
     };
 
+    rust_i18n::set_locale("en");
+
     let app_state = {
         let pool = match setup_database(&app_config.database_url).await {
             Ok(pool) => pool,
@@ -73,13 +78,15 @@ async fn main() {
         };
 
         BotState {
-            exchange_storage: Arc::new(ExchangeRepository::new(pool)),
+            exchange_repository: Arc::new(ExchangeRepository::new(pool.clone())),
+            submission_repository: Arc::new(SubmissionRepository::new(pool.clone())),
+            played_game_repository: Arc::new(PlayedGameRepository::new(pool.clone())),
         }
     };
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![commands::exchange()],
+            commands: vec![commands::exchange(), commands::submit()],
             on_error: |error| {
                 Box::pin(async move {
                     handle_error(error).await;
@@ -115,7 +122,12 @@ async fn main() {
                         }
                     }
 
-                    AssignmentService::create_and_start(app_state.exchange_storage.clone());
+                    AssignmentService::create_and_start(
+                        ctx.http.clone(),
+                        app_state.exchange_repository.clone(),
+                        app_state.submission_repository.clone(),
+                        app_state.played_game_repository.clone(),
+                    );
 
                     Ok(app_state)
                 }

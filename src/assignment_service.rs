@@ -1,21 +1,42 @@
-use std::{sync::Arc, thread, time::Duration};
+use std::{error::Error, sync::Arc, thread};
 
-use time::OffsetDateTime;
+use rust_i18n::t;
+use serenity::http::Http;
+use time::{Duration, OffsetDateTime};
 use tokio::{runtime::Handle, select};
-use tracing::{error, info, info_span, Instrument};
+use tracing::{error, info, info_span, warn, Instrument};
 
-use crate::repository::{ExchangeRepository, ExchangeStorageEvent};
+use crate::{
+    models::types::UtcDateTime,
+    repository::{
+        ExchangeRepository, ExchangeStorageEvent, PlayedGameRepository, SubmissionRepository,
+    },
+    utils::formatting::{format_local, format_utc},
+};
 
 pub struct AssignmentService {
-    next_assignments_time: Option<OffsetDateTime>,
-    exchange_storage: Arc<ExchangeRepository>,
+    http: Arc<Http>,
+    exchange_repository: Arc<ExchangeRepository>,
+    submission_repository: Arc<SubmissionRepository>,
+    played_game_repository: Arc<PlayedGameRepository>,
 }
 
+const DEFAULT_SLEEP_DURATION: Duration = Duration::seconds(60 * 60 /* One hour */);
+const EXCHANGE_START_THRESHOLD: Duration = Duration::seconds(60 * 60 /* One hour */);
+const EXCHANGE_END_THRESHOLD: Duration = Duration::seconds(60 * 60 /* One hour */);
+
 impl AssignmentService {
-    pub fn create_and_start(exchange_storage: Arc<ExchangeRepository>) {
+    pub fn create_and_start(
+        http: Arc<Http>,
+        exchange_repository: Arc<ExchangeRepository>,
+        submission_repository: Arc<SubmissionRepository>,
+        played_game_repository: Arc<PlayedGameRepository>,
+    ) {
         let service = AssignmentService {
-            next_assignments_time: None,
-            exchange_storage,
+            http,
+            exchange_repository,
+            submission_repository,
+            played_game_repository,
         };
 
         service.start();
@@ -26,30 +47,57 @@ impl AssignmentService {
         let rt_handle = Handle::current();
         thread::spawn(move || {
             rt_handle.block_on(async move {
-                self.reschedule().await;
+                let mut next_assignments_time = Some(OffsetDateTime::now_utc());
 
-                let mut exchange_events = self.exchange_storage.subscribe();
+                let mut exchange_events = self.exchange_repository.subscribe();
 
                 loop {
-                    let sleep_duration = self
-                        .next_assignments_time
+                    let sleep_duration = {
+                        let duration = next_assignments_time
                         .map(|time| {
-                            let duration_raw = time - OffsetDateTime::now_utc();
-                            std::time::Duration::from_millis(
-                                duration_raw.whole_milliseconds().try_into().unwrap(),
-                            )
+                            Duration::max(Duration::ZERO, time - OffsetDateTime::now_utc())
                         })
-                        .unwrap_or(Duration::from_secs(60 * 60));
+                        .unwrap_or(DEFAULT_SLEEP_DURATION);
+
+                        std::time::Duration::from_millis(duration.whole_milliseconds() as _)
+                    };
+
+                    info!(
+                        "Next assignments invocation scheduled at {:?} (in {:?})",
+                        OffsetDateTime::now_utc() + sleep_duration,
+                        sleep_duration
+                    );
 
                     select! {
                         _ = tokio::time::sleep(sleep_duration) => {
-                            self.perform_assignments().await;
-                            self.reschedule().await;
+                            if let Err(err) = self.announce_exchange_submissions_open().await {
+                                error!("Could not announce exchange submissions open: {err}");
+                            }
+
+                            if let Err(err) = self.perform_assignments().await {
+                                error!("Could not perform assignments: {err}");
+                            }
+
+                            next_assignments_time = match self.reschedule().await {
+                                Ok(time) => time,
+                                Err(err) => {
+                                    error!("Could not reschedule after performing assignments: {err}");
+                                    None
+                                }
+                            };
                         }
 
                         evt = exchange_events.recv() => {
                             match evt {
-                                Ok(ExchangeStorageEvent::ExchangesUpdated) => self.reschedule().await,
+                                Ok(ExchangeStorageEvent::ExchangesUpdated) => {
+                                    next_assignments_time = match self.reschedule().await {
+                                        Ok(time) => time,
+                                        Err(err) => {
+                                            error!("Could not reschedule after exchanges updated event: {err}");
+                                            None
+                                        }
+                                    };
+                                },
                                 Err(err) => error!("Error while receiving an exchange event: {err:?}"),
                             }
                         }
@@ -60,12 +108,131 @@ impl AssignmentService {
     }
 
     #[tracing::instrument(skip(self))]
-    async fn perform_assignments(&mut self) {
-        info!("Performing assignments");
+    async fn announce_exchange_submissions_open(&self) -> Result<(), Box<dyn Error>> {
+        info!("Announcing exchange submissions opening");
+
+        let now = OffsetDateTime::now_utc();
+        let starting_exchanges = self
+            .exchange_repository
+            .get_starting_exchanges(UtcDateTime::from(now))
+            .await?;
+
+        for exchange in starting_exchanges {
+            let late_period = now - OffsetDateTime::from(exchange.submissions_start);
+
+            if late_period > EXCHANGE_START_THRESHOLD {
+                info!(
+                    "An exchange has been missed by the bot by {}: {}",
+                    late_period, exchange.slug
+                );
+                if let Err(err) = self
+                    .exchange_repository
+                    .update_exchange_state(exchange.id, crate::models::ExchangeState::MissedByBot)
+                    .await
+                {
+                    warn!(
+                        "Could not set exchange {:?} state to MissedByBot: {}",
+                        exchange.id, err
+                    );
+                }
+            } else {
+                {
+                    let message = t!(
+                        "announcements.exchange_start",
+                        name = &exchange.display_name,
+                        slug = &exchange.slug,
+                        end_local = format_local(exchange.submissions_end),
+                        end_utc = format_utc(exchange.submissions_end),
+                    );
+                    exchange.channel.say(&self.http, message).await?;
+                };
+
+                if let Err(err) = self
+                    .exchange_repository
+                    .update_exchange_state(
+                        exchange.id,
+                        crate::models::ExchangeState::AcceptingSubmissions,
+                    )
+                    .await
+                {
+                    warn!(
+                        "Could not set exchange {:?} state to AcceptingSubmissions: {}",
+                        exchange.id, err
+                    );
+                }
+            }
+        }
+
+        Ok(())
     }
 
     #[tracing::instrument(skip(self))]
-    async fn reschedule(&mut self) {
+    async fn perform_assignments(&mut self) -> Result<(), Box<dyn Error>> {
+        info!("Performing assignments");
+
+        let now = OffsetDateTime::now_utc();
+        let ending_exchanges = self
+            .exchange_repository
+            .get_ending_exchanges(UtcDateTime::from(now))
+            .await?;
+
+        for exchange in ending_exchanges {
+            let late_period = now - OffsetDateTime::from(exchange.submissions_end);
+
+            if late_period > EXCHANGE_END_THRESHOLD {
+                info!(
+                    "An exchange has been missed by the bot by {}: {}",
+                    late_period, exchange.slug
+                );
+                if let Err(err) = self
+                    .exchange_repository
+                    .update_exchange_state(exchange.id, crate::models::ExchangeState::MissedByBot)
+                    .await
+                {
+                    warn!(
+                        "Could not set exchange {:?} state to MissedByBot: {}",
+                        exchange.id, err
+                    );
+                }
+            } else {
+                // TODO: Run the solver etc.
+
+                {
+                    let message = t!("announcements.exchange_end", name = &exchange.display_name,);
+                    exchange.channel.say(&self.http, message).await?;
+                };
+
+                if let Err(err) = self
+                    .exchange_repository
+                    .update_exchange_state(
+                        exchange.id,
+                        crate::models::ExchangeState::AssignmentsSent,
+                    )
+                    .await
+                {
+                    warn!(
+                        "Could not set exchange {:?} state to AcceptingSubmissions: {}",
+                        exchange.id, err
+                    );
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    #[tracing::instrument(skip(self))]
+    async fn reschedule(&self) -> Result<Option<OffsetDateTime>, Box<dyn Error>> {
         info!("Rescheduling");
+
+        match self
+            .exchange_repository
+            .get_closest_exchange_end_or_start_date()
+            .await
+        {
+            Ok(Some(date)) => Ok(Some(date.into())),
+            Ok(None) => Ok(None),
+            Err(err) => Err(err.into()),
+        }
     }
 }

@@ -11,17 +11,19 @@ CREATE TABLE exchanges (
     display_name TEXT NOT NULL,
 
     state TEXT NOT NULL,
-    submissions_start DATETIME NOT NULL,
-    submissions_end DATETIME NOT NULL,
+    submissions_start TEXT NOT NULL,
+    submissions_end TEXT NOT NULL,
+
+    games_per_member INTEGER NOT NULL CHECK(games_per_member > 0),
 
     UNIQUE (guild, slug)
-);
+) STRICT;
 
 CREATE TABLE submissions (
     id INTEGER PRIMARY KEY NOT NULL,
     exchange_id INTEGER NOT NULL,
     link TEXT NOT NULL,
-    submitter TEXT NOT NULL,
+    submitter INTEGER NOT NULL,
     submitted_at TEXT NOT NULL,
 
     CONSTRAINT fk_submissions_exchange_id
@@ -29,8 +31,9 @@ CREATE TABLE submissions (
         REFERENCES exchanges(id)
         ON DELETE CASCADE,
 
-    UNIQUE (exchange_id, link)
-);
+    UNIQUE (exchange_id, link),
+    UNIQUE (exchange_id, submitter)
+) STRICT;
 
 CREATE TABLE played_games (
     id INTEGER PRIMARY KEY NOT NULL,
@@ -39,4 +42,4 @@ CREATE TABLE played_games (
     is_manual INTEGER NOT NULL,
 
     UNIQUE (link, member)
-);
+) STRICT;

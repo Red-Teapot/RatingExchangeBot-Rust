@@ -1,12 +1,12 @@
 use poise::serenity_prelude::UserId;
-use sqlx::FromRow;
 
-use super::types::Sqlx;
+#[derive(Clone, Copy, Debug)]
+pub struct PlayedGameId(pub u64);
 
-#[derive(FromRow)]
+#[derive(Debug)]
 pub struct PlayedGame {
-    pub id: i64,
+    pub id: PlayedGameId,
     pub link: String,
-    pub member: Sqlx<UserId>,
+    pub member: UserId,
     pub is_manual: bool,
 }

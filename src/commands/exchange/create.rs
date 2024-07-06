@@ -1,35 +1,29 @@
-use std::{str::FromStr};
+use std::num::NonZeroU8;
+use std::str::FromStr;
 
-
-use poise::serenity_prelude::{ButtonStyle, Channel, Mentionable};
+use poise::serenity_prelude::Mentionable;
+use poise::serenity_prelude::{ButtonStyle, Channel};
 use serenity::{builder::CreateEmbed, utils::Color};
-use time::{format_description, macros::format_description, Duration, OffsetDateTime};
+use time::Duration;
+use time::OffsetDateTime;
 
+use crate::models::{ExchangeState, NewExchange};
+use crate::utils::formatting::{format_local, format_utc};
 use crate::{
-    commands::{arguments::*, camel_slug::slugify_camel, *},
+    commands::{
+        arguments::{ExchangeSlug, HumanDateTime, HumanDuration, TrimmedString},
+        camel_slug::slugify_camel,
+        internal_err, user_err, CommandResult,
+    },
     jam_types::JamType,
-    repository::CreateExchange,
-    utils::{timestamp, TimestampStyle},
 };
 
-const DATETIME_FORMAT: &[format_description::FormatItem<'_>] =
-    format_description!("[year]-[month]-[day] [hour]:[minute]");
-
-#[poise::command(
-    slash_command,
-    guild_only,
-    subcommands("exchange_create", "exchange_list", "exchange_delete"),
-    required_permissions = "ADMINISTRATOR",
-    default_member_permissions = "ADMINISTRATOR"
-)]
-pub async fn exchange(_ctx: Context<'_>) -> CommandResult {
-    Err(user_err("The `/exchange` command is not supported yet"))
-}
+use super::super::ApplicationContext;
 
 /// Create a rating exchange.
 #[allow(clippy::too_many_arguments)]
 #[poise::command(slash_command, rename = "create")]
-pub async fn exchange_create(
+pub async fn create(
     ctx: ApplicationContext<'_>,
 
     #[rename = "type"]
@@ -90,7 +84,8 @@ pub async fn exchange_create(
         }
     };
 
-    let games_per_member = games_per_member.unwrap_or(5);
+    let games_per_member = NonZeroU8::new(games_per_member.unwrap_or(5))
+        .ok_or(user_err("Games per member must be non-zero"))?;
 
     let start = start
         .map(|dt| dt.materialize(OffsetDateTime::now_utc()))
@@ -107,8 +102,14 @@ pub async fn exchange_create(
     {
         let overlapping_exchanges = ctx
             .data
-            .exchange_storage
-            .get_overlapping_exchanges(guild, submission_channel.id, start.into(), end.into())
+            .exchange_repository
+            .get_overlapping_exchanges(
+                guild,
+                submission_channel.id,
+                slug.as_ref(),
+                start.into(),
+                end.into(),
+            )
             .await
             .map_err(|err| {
                 internal_err(&format!("Could not check for overlapping exchanges: {err}"))
@@ -119,7 +120,7 @@ pub async fn exchange_create(
                 let mut content = concat!(
                     "# There are overlapping exchanges\n",
                     "The exchange can't be created because the following exchanges use the same submission channel and ",
-                    "have overlapping submission periods:\n",
+                    "have overlapping submission periods or matching slug:\n",
                 ).to_string();
 
                 for exchange in &overlapping_exchanges {
@@ -127,10 +128,8 @@ pub async fn exchange_create(
                         " - **{}** (slug: `{}`) - runs from {} UTC to {} UTC\n", 
                         exchange.display_name,
                         exchange.slug,
-                        OffsetDateTime::from(exchange.submissions_start).format(DATETIME_FORMAT)
-                            .expect("Format should be correct since it's hardcoded"),
-                        OffsetDateTime::from(exchange.submissions_end).format(DATETIME_FORMAT)
-                            .expect("Format should be correct since it's hardcoded"),
+                        format_utc(exchange.submissions_start),
+                        format_utc(exchange.submissions_end),
                     );
                 }
 
@@ -157,21 +156,14 @@ pub async fn exchange_create(
                 "Start",
                 &format!(
                     "{} UTC or {} your time",
-                    start
-                        .format(DATETIME_FORMAT)
-                        .expect("Format should be correct since it's hardcoded"),
-                    timestamp(start, TimestampStyle::ShortDateTime)
+                    format_utc(start),
+                    format_local(start),
                 ),
                 false,
             )
             .field(
                 "End",
-                &format!(
-                    "{} UTC or {} your time",
-                    end.format(DATETIME_FORMAT)
-                        .expect("Format should be correct since it's hardcoded"),
-                    timestamp(end, TimestampStyle::ShortDateTime)
-                ),
+                &format!("{} UTC or {} your time", format_utc(end), format_local(end),),
                 false,
             )
             .field("Duration", &format!("{duration}"), false)
@@ -238,17 +230,18 @@ pub async fn exchange_create(
             "confirm" => {
                 let creation_result = ctx
                     .data
-                    .exchange_storage
-                    .create_exchange(CreateExchange {
+                    .exchange_repository
+                    .create_exchange(NewExchange {
                         guild,
                         channel: submission_channel.id,
                         jam_type,
                         jam_link: jam_link.to_string(),
                         slug: slug.to_string(),
                         display_name: display_name.to_string(),
-                        start: start.into(),
-                        duration,
-                        games_per_member,
+                        state: ExchangeState::NotStartedYet,
+                        submissions_start: start.into(),
+                        submissions_end: end.into(),
+                        games_per_member: games_per_member,
                     })
                     .await;
 
@@ -279,100 +272,6 @@ pub async fn exchange_create(
             id => {
                 return Err(internal_err(&format!("Unknown interaction ID: {}", id)));
             }
-        }
-    }
-
-    Ok(())
-}
-
-#[poise::command(slash_command, rename = "delete")]
-pub async fn exchange_delete(
-    ctx: ApplicationContext<'_>,
-    #[description = "Exchange slug"] slug: String,
-) -> CommandResult {
-    let deletion_result = ctx
-        .data
-        .exchange_storage
-        .delete_exchange(
-            ctx.guild_id().ok_or(internal_err(
-                "This command should be executed only in a guild",
-            ))?,
-            &slug,
-        )
-        .await;
-
-    match deletion_result {
-        Ok(true) => {
-            ctx.send(|reply| reply.content(&format!("# Exchange `{slug}` deleted")))
-                .await?;
-        }
-
-        Ok(false) => {
-            return Err(user_err(&format!(
-                "Exchange with slug `{slug}` does not exist"
-            )));
-        }
-
-        Err(err) => {
-            return Err(internal_err(&format!(
-                "Could not delete the exchage: {err}"
-            )));
-        }
-    }
-
-    Ok(())
-}
-
-#[poise::command(slash_command, rename = "list")]
-pub async fn exchange_list(ctx: ApplicationContext<'_>) -> CommandResult {
-    let upcoming_exchanges = ctx
-        .data
-        .exchange_storage
-        .get_upcoming_exchanges(
-            ctx.guild_id().ok_or(internal_err(
-                "This command should be executed only in a guild",
-            ))?,
-            OffsetDateTime::now_utc().into(),
-        )
-        .await;
-
-    match upcoming_exchanges {
-        Ok(exchanges) if exchanges.is_empty() => {
-            ctx.send(|reply| {
-                reply
-                    .content("# There are no upcoming exchanges")
-                    .ephemeral(true)
-            })
-            .await?;
-        }
-
-        Ok(exchanges) => {
-            ctx.send(|reply| {
-                let list = exchanges.iter().fold(String::new(), |acc, exchange| {
-                    acc + &format!(
-                        " - **{}** (slug: `{}`) - runs from {} UTC to {} UTC\n",
-                        exchange.display_name,
-                        exchange.slug,
-                        OffsetDateTime::from(exchange.submissions_start)
-                            .format(DATETIME_FORMAT)
-                            .expect("Format should be correct since it's hardcoded"),
-                        OffsetDateTime::from(exchange.submissions_end)
-                            .format(DATETIME_FORMAT)
-                            .expect("Format should be correct since it's hardcoded"),
-                    )
-                });
-
-                reply
-                    .content(&format!("# Upcoming exchanges:\n{list}"))
-                    .ephemeral(true)
-            })
-            .await?;
-        }
-
-        Err(err) => {
-            return Err(internal_err(&format!(
-                "Could not get the upcoming exchanges: {err}"
-            )));
         }
     }
 
