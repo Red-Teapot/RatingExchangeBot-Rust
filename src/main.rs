@@ -19,7 +19,7 @@ use poise_error_handler::handle_error;
 use repository::{ExchangeRepository, PlayedGameRepository, SubmissionRepository};
 use serde::Deserialize;
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
-use tokio::{select, signal};
+use tokio::{select, signal, sync::Notify};
 use tracing::{error, info, info_span, warn, Instrument};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -73,6 +73,9 @@ async fn main() {
         }
     };
 
+    let shutdown_notify = Arc::new(Notify::new());
+    let assignment_service_shutdown = shutdown_notify.clone();
+
     let app_state = BotState {
         exchange_repository: Arc::new(ExchangeRepository::new(db_pool.clone())),
         submission_repository: Arc::new(SubmissionRepository::new(db_pool.clone())),
@@ -116,6 +119,7 @@ async fn main() {
                     }
 
                     AssignmentService::create_and_start(
+                        assignment_service_shutdown,
                         ctx.http.clone(),
                         app_state.exchange_repository.clone(),
                         app_state.submission_repository.clone(),
@@ -143,6 +147,7 @@ async fn main() {
     select! {
         _ = signal::ctrl_c() => {
             info!("Ctrl-C received, shutting down");
+            shutdown_notify.notify_waiters();
             client.shard_manager.shutdown_all().await;
             db_pool.close().await;
         },
@@ -153,6 +158,10 @@ async fn main() {
             }
         },
     };
+}
+
+async fn run() -> Result<(), anyhow::Error> {
+    Ok(())
 }
 
 #[tracing::instrument(skip(url))]

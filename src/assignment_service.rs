@@ -3,7 +3,7 @@ use std::{error::Error, sync::Arc, thread};
 use indoc::formatdoc;
 use serenity::http::Http;
 use time::{Duration, OffsetDateTime};
-use tokio::{runtime::Handle, select};
+use tokio::{runtime::Handle, select, sync::Notify};
 use tracing::{error, info, info_span, warn, Instrument};
 
 use crate::{
@@ -15,6 +15,7 @@ use crate::{
 };
 
 pub struct AssignmentService {
+    shutdown: Arc<Notify>,
     http: Arc<Http>,
     exchange_repository: Arc<ExchangeRepository>,
     submission_repository: Arc<SubmissionRepository>,
@@ -27,12 +28,14 @@ const EXCHANGE_END_THRESHOLD: Duration = Duration::seconds(60 * 60 /* One hour *
 
 impl AssignmentService {
     pub fn create_and_start(
+        shutdown: Arc<Notify>,
         http: Arc<Http>,
         exchange_repository: Arc<ExchangeRepository>,
         submission_repository: Arc<SubmissionRepository>,
         played_game_repository: Arc<PlayedGameRepository>,
     ) {
         let service = AssignmentService {
+            shutdown,
             http,
             exchange_repository,
             submission_repository,
@@ -50,6 +53,7 @@ impl AssignmentService {
                 let mut next_assignments_time = Some(OffsetDateTime::now_utc());
 
                 let mut exchange_events = self.exchange_repository.subscribe();
+                let shutdown_notify = self.shutdown.clone();
 
                 loop {
                     let sleep_duration = {
@@ -69,6 +73,10 @@ impl AssignmentService {
                     );
 
                     select! {
+                        _ = shutdown_notify.notified() => {
+                            break
+                        }
+
                         _ = tokio::time::sleep(sleep_duration) => {
                             if let Err(err) = self.announce_exchange_submissions_open().await {
                                 error!("Could not announce exchange submissions open: {err}");
