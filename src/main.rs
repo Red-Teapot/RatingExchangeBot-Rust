@@ -14,11 +14,12 @@ use std::{process::exit, sync::Arc};
 
 use assignment_service::AssignmentService;
 
-use poise::serenity_prelude::{self as serenity, GuildId};
+use poise::{serenity_prelude::*, Framework};
 use poise_error_handler::handle_error;
 use repository::{ExchangeRepository, PlayedGameRepository, SubmissionRepository};
 use serde::Deserialize;
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
+use tokio::{select, signal};
 use tracing::{error, info, info_span, warn, Instrument};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -35,8 +36,6 @@ pub struct BotState {
     pub submission_repository: Arc<SubmissionRepository>,
     pub played_game_repository: Arc<PlayedGameRepository>,
 }
-
-rust_i18n::i18n!("locales");
 
 #[tracing::instrument]
 #[tokio::main]
@@ -66,25 +65,21 @@ async fn main() {
         }
     };
 
-    rust_i18n::set_locale("en");
-
-    let app_state = {
-        let pool = match setup_database(&app_config.database_url).await {
-            Ok(pool) => pool,
-            Err(err) => {
-                error!("Could not setup database: {err}");
-                std::process::exit(255);
-            }
-        };
-
-        BotState {
-            exchange_repository: Arc::new(ExchangeRepository::new(pool.clone())),
-            submission_repository: Arc::new(SubmissionRepository::new(pool.clone())),
-            played_game_repository: Arc::new(PlayedGameRepository::new(pool.clone())),
+    let db_pool = match setup_database(&app_config.database_url).await {
+        Ok(pool) => pool,
+        Err(err) => {
+            error!("Could not setup database: {err}");
+            std::process::exit(255);
         }
     };
 
-    let framework = poise::Framework::builder()
+    let app_state = BotState {
+        exchange_repository: Arc::new(ExchangeRepository::new(db_pool.clone())),
+        submission_repository: Arc::new(SubmissionRepository::new(db_pool.clone())),
+        played_game_repository: Arc::new(PlayedGameRepository::new(db_pool.clone())),
+    };
+
+    let framework = Framework::builder()
         .options(poise::FrameworkOptions {
             commands: vec![commands::exchange(), commands::submit()],
             on_error: |error| {
@@ -94,8 +89,6 @@ async fn main() {
             },
             ..Default::default()
         })
-        .token(app_config.discord_bot_token)
-        .intents(serenity::GatewayIntents::GUILD_MESSAGES)
         .setup(move |ctx, _ready, framework| {
             Box::pin(
                 async move {
@@ -108,10 +101,10 @@ async fn main() {
                     }
 
                     if let Some(guilds) = app_config.register_commands_in_guilds {
-                        for guild in guilds.iter().map(|g| GuildId(*g)) {
+                        for guild in guilds.iter().map(|g| GuildId::new(*g)) {
                             let guild_name = ctx
-                                .http
-                                .get_guild(guild.0)
+                                .http()
+                                .get_guild(guild)
                                 .await
                                 .map(|g| g.name)
                                 .unwrap_or("???".to_string());
@@ -133,9 +126,33 @@ async fn main() {
                 }
                 .instrument(info_span!("bot_setup")),
             )
-        });
+        })
+        .build();
 
-    framework.run().await.unwrap();
+    let mut client = match ClientBuilder::new(app_config.discord_bot_token, GatewayIntents::empty())
+        .framework(framework)
+        .await
+    {
+        Ok(client) => client,
+        Err(err) => {
+            error!("Failed to create the client: {err}");
+            exit(255);
+        }
+    };
+
+    select! {
+        _ = signal::ctrl_c() => {
+            info!("Ctrl-C received, shutting down");
+            client.shard_manager.shutdown_all().await;
+            db_pool.close().await;
+        },
+
+        result = client.start() => {
+            if let Err(err) = result {
+                error!("Failed to start the client: {err}");
+            }
+        },
+    };
 }
 
 #[tracing::instrument(skip(url))]

@@ -82,7 +82,7 @@ impl ExchangeRepository {
                 submissions_end,
                 games_per_member,
             )
-            .fetch_one(&mut transaction)
+            .fetch_one(&mut *transaction)
             .await?
         };
 
@@ -121,7 +121,7 @@ impl ExchangeRepository {
                 end,
                 slug,
             )
-            .fetch_all(&mut transaction)
+            .fetch_all(&mut *transaction)
             .await?
         };
 
@@ -155,7 +155,7 @@ impl ExchangeRepository {
                 guild,
                 after,
             )
-            .fetch_all(&mut transaction)
+            .fetch_all(&mut *transaction)
             .await?
         };
 
@@ -188,7 +188,7 @@ impl ExchangeRepository {
                 not_started_yet,
                 date,
             )
-            .fetch_all(&mut transaction)
+            .fetch_all(&mut *transaction)
             .await?
         };
 
@@ -221,7 +221,7 @@ impl ExchangeRepository {
                 accepting_submissions,
                 date,
             )
-            .fetch_all(&mut transaction)
+            .fetch_all(&mut *transaction)
             .await?
         };
 
@@ -256,7 +256,7 @@ impl ExchangeRepository {
                 not_started_yet,
                 accepting_submissions,
             )
-            .fetch_optional(&mut transaction)
+            .fetch_optional(&mut *transaction)
             .await?
         };
 
@@ -284,7 +284,7 @@ impl ExchangeRepository {
             state,
             exchange_id,
         )
-        .execute(&mut transaction)
+        .execute(&mut *transaction)
         .await?;
 
         transaction.commit().await?;
@@ -301,7 +301,7 @@ impl ExchangeRepository {
             guild,
             slug,
         )
-        .execute(&mut transaction)
+        .execute(&mut *transaction)
         .await?;
 
         transaction.commit().await?;

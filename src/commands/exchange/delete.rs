@@ -1,3 +1,5 @@
+use poise::CreateReply;
+
 use crate::commands::{internal_err, user_err, ApplicationContext, CommandResult};
 
 #[poise::command(slash_command, rename = "delete")]
@@ -18,7 +20,7 @@ pub async fn delete(
 
     match deletion_result {
         Ok(true) => {
-            ctx.send(|reply| reply.content(&format!("# Exchange `{slug}` deleted")))
+            ctx.send(CreateReply::default().content(format!("# Exchange `{slug}` deleted")))
                 .await?;
         }
 

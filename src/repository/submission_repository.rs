@@ -35,12 +35,13 @@ impl SubmissionRepository {
                 r#"
                     SELECT * FROM submissions
                     WHERE exchange_id = $1 AND (submitter = $2 OR link = $3)
+                    LIMIT 1
                 "#,
                 exchange_id,
                 submitter,
                 link,
             )
-            .fetch_optional(&mut transaction)
+            .fetch_optional(&mut *transaction)
             .await?
         };
 
@@ -83,7 +84,7 @@ impl SubmissionRepository {
                 submitter,
                 submitted_at,
             )
-            .fetch_one(&mut transaction)
+            .fetch_one(&mut *transaction)
             .await?
         };
 

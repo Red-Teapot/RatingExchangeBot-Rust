@@ -251,7 +251,7 @@ mod tests {
     use std::collections::{HashMap, HashSet};
     use test_log::test;
 
-    use map_macro::{map, set};
+    use map_macro::{hash_map as map, hash_set as set};
 
     use super::{edge, FlowNetwork};
 

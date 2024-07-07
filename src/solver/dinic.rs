@@ -206,7 +206,7 @@ mod tests {
     use std::collections::{HashMap, HashSet, LinkedList};
     use test_log::test;
 
-    use map_macro::map;
+    use map_macro::hash_map as map;
 
     use crate::solver::flow_network::{edge, Flow, FlowNetwork};
 

@@ -1,4 +1,4 @@
-use poise::{Context, FrameworkError};
+use poise::{Context, CreateReply, FrameworkError};
 use tracing::{error, warn};
 
 use crate::{commands::CommandError, BotState};
@@ -12,10 +12,14 @@ pub async fn handle_error(error: poise::FrameworkError<'_, BotState, CommandErro
         }
 
         EventHandler { error, event, .. } => {
-            error!("Error in user event {} handler: {}", event.name(), error);
+            error!(
+                "Error in user event {} handler: {}",
+                event.snake_case_name(),
+                error
+            );
         }
 
-        Command { error, ctx } => match error {
+        Command { error, ctx, .. } => match error {
             CommandError::UserError { message } => {
                 reply_with_error(ctx, &message).await;
             }
@@ -31,12 +35,15 @@ pub async fn handle_error(error: poise::FrameworkError<'_, BotState, CommandErro
             }
         },
 
-        ArgumentParse { error, input, ctx } => {
+        ArgumentParse {
+            error, input, ctx, ..
+        } => {
             let usage = ctx
                 .command()
                 .help_text
-                .map(|h| h())
-                .unwrap_or("Please check the help menu or contact the admins.".to_string());
+                .as_ref()
+                .map(|t| t.as_str())
+                .unwrap_or("Please check the help menu or contact the admins.");
 
             let response = if let Some(input) = input {
                 format!(
@@ -50,7 +57,9 @@ pub async fn handle_error(error: poise::FrameworkError<'_, BotState, CommandErro
             reply_with_error(ctx, &response).await;
         }
 
-        CommandStructureMismatch { description, ctx } => {
+        CommandStructureMismatch {
+            description, ctx, ..
+        } => {
             error!(
                 "Failed to deserialize interaction arguments for `{}`: {}",
                 ctx.command.qualified_name, description
@@ -60,6 +69,7 @@ pub async fn handle_error(error: poise::FrameworkError<'_, BotState, CommandErro
         CooldownHit {
             remaining_cooldown,
             ctx,
+            ..
         } => {
             reply_with_error(
                 ctx,
@@ -87,19 +97,19 @@ pub async fn handle_error(error: poise::FrameworkError<'_, BotState, CommandErro
             .await;
         }
 
-        NotAnOwner { ctx } => {
+        NotAnOwner { ctx, .. } => {
             reply_with_error(ctx, "Sorry, only the server owner can run this command.").await;
         }
 
-        GuildOnly { ctx } => {
+        GuildOnly { ctx, .. } => {
             reply_with_error(ctx, "Sorry, but you can only run this command in a server.").await;
         }
 
-        DmOnly { ctx } => {
+        DmOnly { ctx, .. } => {
             reply_with_error(ctx, "Sorry, but you can only run this command in bot DMs.").await;
         }
 
-        NsfwOnly { ctx } => {
+        NsfwOnly { ctx, .. } => {
             reply_with_error(
                 ctx,
                 "Sorry, but you can only run this command in a NSFW channel.",
@@ -107,7 +117,7 @@ pub async fn handle_error(error: poise::FrameworkError<'_, BotState, CommandErro
             .await;
         }
 
-        CommandCheckFailed { error, ctx } => {
+        CommandCheckFailed { error, ctx, .. } => {
             let message = if let Some(error) = error {
                 format!(
                     "Sorry, can't run this command due to a failed command check: {}",
@@ -149,8 +159,13 @@ pub async fn handle_error(error: poise::FrameworkError<'_, BotState, CommandErro
 }
 
 async fn reply_with_error(ctx: Context<'_, BotState, CommandError>, error_message: &str) {
-    if let Err(send_error) =
-        poise::send_reply(ctx, |f| f.content(error_message).ephemeral(true)).await
+    if let Err(send_error) = poise::send_reply(
+        ctx,
+        CreateReply::default()
+            .content(error_message)
+            .ephemeral(true),
+    )
+    .await
     {
         error!(
             "Failed to send an error message to the user: {}\nThe message was: {}",
@@ -160,10 +175,12 @@ async fn reply_with_error(ctx: Context<'_, BotState, CommandError>, error_messag
 }
 
 async fn reply_with_internal_error(ctx: Context<'_, BotState, CommandError>, error_message: &str) {
-    let message = format!(
-        "Sorry, there was an internal error while executing your command: {}",
-        error_message
-    );
-
-    let _ = poise::send_reply(ctx, |f| f.content(message).ephemeral(true)).await;
+    reply_with_error(
+        ctx,
+        &format!(
+            "Sorry, there was an internal error while executing your command: {}",
+            error_message
+        ),
+    )
+    .await;
 }

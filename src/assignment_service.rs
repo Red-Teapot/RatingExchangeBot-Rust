@@ -1,6 +1,6 @@
 use std::{error::Error, sync::Arc, thread};
 
-use rust_i18n::t;
+use indoc::formatdoc;
 use serenity::http::Http;
 use time::{Duration, OffsetDateTime};
 use tokio::{runtime::Handle, select};
@@ -137,13 +137,21 @@ impl AssignmentService {
                 }
             } else {
                 {
-                    let message = t!(
-                        "announcements.exchange_start",
-                        name = &exchange.display_name,
-                        slug = &exchange.slug,
+                    let message = formatdoc! {
+                        r#"
+                            # Review exchange {name} starts now!
+
+                            **Submit your jam entry using the `/submit {slug} <entry link>` command.**
+
+                            The exchange ends on {end_local} your time or {end_utc} UTC. You should submit your entry before this deadline.
+
+                            After the deadline, you will receive a list of entries to play and rate in your DMs.
+                        "#,
+                        name = exchange.display_name,
+                        slug = exchange.slug,
                         end_local = format_local(exchange.submissions_end),
                         end_utc = format_utc(exchange.submissions_end),
-                    );
+                    };
                     exchange.channel.say(&self.http, message).await?;
                 };
 
@@ -198,7 +206,16 @@ impl AssignmentService {
                 // TODO: Run the solver etc.
 
                 {
-                    let message = t!("announcements.exchange_end", name = &exchange.display_name,);
+                    let message = formatdoc! {
+                        r#"
+                            # Review exchange {name} has just ended!
+
+                            **You should have received your assignments to play and rate in the DMs.**
+
+                            If that didn't happen, please contact the moderators.
+                        "#,
+                        name = exchange.display_name,
+                    };
                     exchange.channel.say(&self.http, message).await?;
                 };
 

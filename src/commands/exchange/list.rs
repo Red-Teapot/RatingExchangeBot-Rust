@@ -1,3 +1,4 @@
+use poise::CreateReply;
 use time::OffsetDateTime;
 
 use crate::{
@@ -20,30 +21,30 @@ pub async fn list(ctx: ApplicationContext<'_>) -> CommandResult {
 
     match upcoming_exchanges {
         Ok(exchanges) if exchanges.is_empty() => {
-            ctx.send(|reply| {
-                reply
+            ctx.send(
+                CreateReply::default()
                     .content("# There are no upcoming exchanges")
-                    .ephemeral(true)
-            })
+                    .ephemeral(true),
+            )
             .await?;
         }
 
         Ok(exchanges) => {
-            ctx.send(|reply| {
-                let list = exchanges.iter().fold(String::new(), |acc, exchange| {
-                    acc + &format!(
-                        " - **{}** (slug: `{}`) - runs from {} UTC to {} UTC\n",
-                        exchange.display_name,
-                        exchange.slug,
-                        format_utc(exchange.submissions_start),
-                        format_utc(exchange.submissions_end),
-                    )
-                });
+            let list = exchanges.iter().fold(String::new(), |acc, exchange| {
+                acc + &format!(
+                    " - **{}** (slug: `{}`) - runs from {} UTC to {} UTC\n",
+                    exchange.display_name,
+                    exchange.slug,
+                    format_utc(exchange.submissions_start),
+                    format_utc(exchange.submissions_end),
+                )
+            });
 
-                reply
+            ctx.send(
+                CreateReply::default()
                     .content(&format!("# Upcoming exchanges:\n{list}"))
-                    .ephemeral(true)
-            })
+                    .ephemeral(true),
+            )
             .await?;
         }
 

@@ -1,4 +1,4 @@
-use rust_i18n::t;
+use indoc::formatdoc;
 use time::OffsetDateTime;
 use tracing::debug;
 
@@ -25,7 +25,15 @@ pub async fn submit(
             .await
         {
             Ok(exchanges) if exchanges.is_empty() => {
-                return Err(user_err(t!("commands.submit.no_exchanges", slug = &slug)));
+                let message = formatdoc! {
+                    r#"
+                        **There are no active exchanges with slug `%{slug}` in this channel.**
+
+                        Check the starting and ending dates of the exchanges and their submission channels.
+                    "#,
+                    slug = slug,
+                };
+                return Err(user_err(message));
             }
 
             Ok(mut exchanges) if exchanges.len() == 1 => {
@@ -59,10 +67,17 @@ pub async fn submit(
         match jam_type.normalize_jam_entry_link(&jam_link, &link) {
             Some(link) => link,
             None => {
-                return Err(user_err(t!(
-                    "commands.submit.invalid_link",
-                    example = jam_type.jam_entry_link_example(&jam_link)
-                )));
+                let message = formatdoc! {
+                    r#"
+                        **Your entry link is invalid.**
+
+                        It should look like this: `{example}`.
+
+                        Make sure to use the correct submission page.
+                    "#,
+                    example = jam_type.jam_entry_link_example(&jam_link),
+                };
+                return Err(user_err(message));
             }
         }
     };
@@ -95,6 +110,4 @@ pub async fn submit(
     };
 
     return Err(internal_err("Not implemented yet"));
-
-    Ok(())
 }

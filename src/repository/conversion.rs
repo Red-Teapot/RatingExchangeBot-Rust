@@ -47,6 +47,7 @@ impl DBConvertible for UtcDateTime {
     }
 }
 
+// TODO: Check i64 before conversion to avoid panic
 impl DBConvertible for ExchangeId {
     type DBType = i64;
 
@@ -75,11 +76,11 @@ impl DBConvertible for UserId {
     type DBType = i64;
 
     fn to_db(&self) -> Result<Self::DBType, DBToConversionError> {
-        Ok(self.0 as _)
+        Ok(self.get() as _)
     }
 
     fn from_db(value: &Self::DBType) -> Result<Self, DBFromConversionError> {
-        Ok(UserId(*value as _))
+        Ok(UserId::new(*value as _))
     }
 }
 
@@ -87,11 +88,11 @@ impl DBConvertible for GuildId {
     type DBType = i64;
 
     fn to_db(&self) -> Result<Self::DBType, DBToConversionError> {
-        Ok(self.0 as _)
+        Ok(self.get() as _)
     }
 
     fn from_db(value: &Self::DBType) -> Result<Self, DBFromConversionError> {
-        Ok(GuildId(*value as _))
+        Ok(GuildId::new(*value as _))
     }
 }
 
@@ -99,11 +100,11 @@ impl DBConvertible for ChannelId {
     type DBType = i64;
 
     fn to_db(&self) -> Result<Self::DBType, DBToConversionError> {
-        Ok(self.0 as _)
+        Ok(self.get() as _)
     }
 
     fn from_db(value: &Self::DBType) -> Result<Self, DBFromConversionError> {
-        Ok(ChannelId(*value as _))
+        Ok(ChannelId::new(*value as _))
     }
 }
 

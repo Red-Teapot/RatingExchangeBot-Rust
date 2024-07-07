@@ -1,8 +1,7 @@
 use lazy_regex::regex_captures;
 use poise::ChoiceParameter;
-use sqlx::Type;
 
-#[derive(ChoiceParameter, Copy, Clone, Debug, Type)]
+#[derive(ChoiceParameter, Copy, Clone, Debug)]
 #[repr(i32)]
 pub enum JamType {
     #[name = "Itch.io jam"]
