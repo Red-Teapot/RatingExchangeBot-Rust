@@ -1,6 +1,5 @@
 use poise::serenity_prelude::UserId;
 use sqlx::{query_as, Pool, Sqlite};
-use tracing::debug;
 
 use crate::{
     models::{types::UtcDateTime, ExchangeId, NewSubmission, Submission, SubmissionId},
@@ -20,15 +19,13 @@ impl SubmissionRepository {
 
     pub async fn get_conflicting_submission(
         &self,
-        exchange_id: ExchangeId,
-        submitter: UserId,
-        link: &str,
+        new_submission: &NewSubmission,
     ) -> Result<Option<Submission>, anyhow::Error> {
         let mut transaction = self.pool.begin().await?;
 
         let conflict = {
-            let exchange_id = exchange_id.to_db()?;
-            let submitter = submitter.to_db()?;
+            let exchange_id = new_submission.exchange_id.to_db()?;
+            let submitter = new_submission.submitter.to_db()?;
 
             query_as!(
                 SqlSubmission,
@@ -39,15 +36,13 @@ impl SubmissionRepository {
                 "#,
                 exchange_id,
                 submitter,
-                link,
+                new_submission.link,
             )
             .fetch_optional(&mut *transaction)
             .await?
         };
 
         transaction.commit().await?;
-
-        debug!("Conflict for exchange {exchange_id:?}, submitter {submitter}, link {link}: {conflict:?}");
 
         match conflict {
             Some(conflict) => Ok(Some(Submission::from_db(&conflict)?)),
@@ -72,6 +67,7 @@ impl SubmissionRepository {
                 r#"
                     INSERT INTO submissions (exchange_id, link, submitter, submitted_at)
                     VALUES ($1, $2, $3, $4)
+                    ON CONFLICT (exchange_id, submitter) DO UPDATE SET link = $2
                     RETURNING 
                         id AS "id!", 
                         exchange_id AS "exchange_id!",
@@ -89,8 +85,6 @@ impl SubmissionRepository {
         };
 
         transaction.commit().await?;
-
-        debug!("New submission: {added_submission:?}");
 
         Ok(Submission::from_db(&added_submission)?)
     }
@@ -126,26 +120,5 @@ impl DBConvertible for Submission {
             submitter: UserId::from_db(&value.submitter)?,
             submitted_at: UtcDateTime::from_db(&value.submitted_at)?,
         })
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use sqlx::sqlite::SqlitePoolOptions;
-
-    use super::SubmissionRepository;
-
-    async fn create_inmem_repository() -> Result<SubmissionRepository, anyhow::Error> {
-        let pool = SqlitePoolOptions::new().connect("file::memory:").await?;
-        sqlx::migrate!("./migrations").run(&pool).await?;
-
-        let repository = SubmissionRepository { pool };
-
-        Ok(repository)
-    }
-
-    #[tokio::test]
-    async fn nothing() {
-        // let repository = create_inmem_repository().await.unwrap();
     }
 }

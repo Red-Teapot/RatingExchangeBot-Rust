@@ -85,11 +85,7 @@ async fn main() {
     let framework = Framework::builder()
         .options(poise::FrameworkOptions {
             commands: vec![commands::exchange(), commands::submit()],
-            on_error: |error| {
-                Box::pin(async move {
-                    handle_error(error).await;
-                })
-            },
+            on_error: |error| Box::pin(handle_error(error)),
             ..Default::default()
         })
         .setup(move |ctx, _ready, framework| {

@@ -1,10 +1,12 @@
 use indoc::formatdoc;
+use poise::CreateReply;
 use time::OffsetDateTime;
 use tracing::debug;
 
 use crate::{
     commands::{internal_err, user_err, ApplicationContext, CommandResult},
     models::{types::UtcDateTime, NewSubmission},
+    utils::formatting::{format_local, format_utc},
 };
 
 #[poise::command(slash_command, rename = "submit")]
@@ -27,7 +29,7 @@ pub async fn submit(
             Ok(exchanges) if exchanges.is_empty() => {
                 let message = formatdoc! {
                     r#"
-                        **There are no active exchanges with slug `%{slug}` in this channel.**
+                        **There are no active exchanges with slug `{slug}` in this channel.**
 
                         Check the starting and ending dates of the exchanges and their submission channels.
                     "#,
@@ -82,16 +84,58 @@ pub async fn submit(
         }
     };
 
-    debug!("Normalized link: {link}");
-
     let submission = NewSubmission {
         exchange_id: exchange.id,
-        link: link,
+        link,
         submitter: ctx.author().id,
         submitted_at: UtcDateTime::from(OffsetDateTime::now_utc()),
     };
 
-    debug!("New submission: {submission:?}");
+    let mut message: String = formatdoc! {
+        r#"
+            **Submitted!**
+
+            You will receive your assignments in the DMs when the exchange ends: {end_local} your time or {end_utc} UTC.
+        "#,
+        end_local = format_local(exchange.submissions_end),
+        end_utc = format_utc(exchange.submissions_end),
+    };
+
+    if let Ok(Some(conflict)) = ctx
+        .data
+        .submission_repository
+        .get_conflicting_submission(&submission)
+        .await
+    {
+        if submission.link == conflict.link {
+            let message = formatdoc! {
+                r#"
+                    **Someone else has already submitted this link**
+
+                    If you worked in a team, only one team member can submit an entry and get assignments.
+                "#,
+            };
+            return Err(user_err(message));
+        }
+
+        if submission.submitter == conflict.submitter {
+            message = formatdoc! {
+                r#"
+                    **Updated your submission**
+
+                    Previously submitted link: `{old_link}`.
+
+                    New link: `{new_link}`.
+
+                    You will receive your assignments in the DMs when the exchange ends: {end_local} your time or {end_utc} UTC.
+                "#,
+                old_link = conflict.link,
+                new_link = submission.link,
+                end_local = format_local(exchange.submissions_end),
+                end_utc = format_utc(exchange.submissions_end),
+            };
+        }
+    }
 
     match ctx
         .data
@@ -99,15 +143,13 @@ pub async fn submit(
         .add_or_update_submission(&submission)
         .await
     {
-        Ok(submission) => {
-            debug!("??? {submission:?}");
+        Ok(_) => {
+            ctx.send(CreateReply::default().ephemeral(true).content(message))
+                .await?;
+            Ok(())
         }
-        Err(err) => {
-            return Err(internal_err(format!(
-                "Could not add/update submission: {err}"
-            )));
-        }
-    };
-
-    return Err(internal_err("Not implemented yet"));
+        Err(err) => Err(internal_err(format!(
+            "Could not add/update submission: {err}"
+        ))),
+    }
 }

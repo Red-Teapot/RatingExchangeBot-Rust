@@ -1,6 +1,7 @@
 use std::num::NonZeroU8;
 use std::str::FromStr;
 
+use indoc::formatdoc;
 use poise::serenity_prelude::Mentionable;
 use poise::serenity_prelude::{ButtonStyle, Channel};
 use poise::{ChoiceParameter, CreateReply};
@@ -111,18 +112,20 @@ pub async fn create(
             )
             .await
             .map_err(|err| {
-                internal_err(&format!("Could not check for overlapping exchanges: {err}"))
+                internal_err(format!("Could not check for overlapping exchanges: {err}"))
             })?;
 
         if !overlapping_exchanges.is_empty() {
-            let mut content = concat!(
-                "# There are overlapping exchanges\n",
-                "The exchange can't be created because the following exchanges use the same submission channel and ",
-                "have overlapping submission periods or matching slug:\n",
-            ).to_string();
+            let mut message = formatdoc! {
+                r#"
+                    # There are overlapping exchanges
+
+                    The exchange can't be created because the following exchanges use the same submission channel and have overlapping submission periods or matching slug:
+                "#,
+            };
 
             for exchange in &overlapping_exchanges {
-                content += &format!(
+                message += &format!(
                     " - **{}** (slug: `{}`) - runs from {} UTC to {} UTC\n",
                     exchange.display_name,
                     exchange.slug,
@@ -131,10 +134,7 @@ pub async fn create(
                 );
             }
 
-            ctx.send(CreateReply::default().content(content).ephemeral(true))
-                .await?;
-
-            return Ok(());
+            return Err(user_err(message));
         }
     }
 
@@ -192,6 +192,7 @@ pub async fn create(
                         ctx.into(),
                         CreateReply::default()
                             .content("# Canceled!")
+                            .components(vec![])
                             .embed(create_new_exchange_embed(&new_exchange, Color::RED)),
                     )
                     .await?;
@@ -220,9 +221,13 @@ pub async fn create(
                         reply
                             .edit(
                                 ctx.into(),
-                                CreateReply::default().content("# Exchange created!").embed(
-                                    create_new_exchange_embed(&new_exchange, Color::DARK_GREEN),
-                                ),
+                                CreateReply::default()
+                                    .content("# Exchange created!")
+                                    .components(vec![])
+                                    .embed(create_new_exchange_embed(
+                                        &new_exchange,
+                                        Color::DARK_GREEN,
+                                    )),
                             )
                             .await?;
                     }
@@ -231,6 +236,7 @@ pub async fn create(
                             .edit(
                                 ctx.into(),
                                 CreateReply::default()
+                                    .components(vec![])
                                     .content(format!("# Could not create exchange!\n{err}")),
                             )
                             .await?;
