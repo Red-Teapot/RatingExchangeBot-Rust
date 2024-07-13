@@ -1,8 +1,8 @@
 use poise::serenity_prelude::UserId;
-use sqlx::{query_as, Pool, Sqlite};
+use sqlx::{query, query_as, Pool, Sqlite};
 
 use crate::{
-    models::{types::UtcDateTime, ExchangeId, NewSubmission, Submission, SubmissionId},
+    models::{types::UtcDateTime, ExchangeId, ExchangeState, NewSubmission, Submission, SubmissionId},
     repository::conversion::DBConvertible,
 };
 
@@ -87,6 +87,33 @@ impl SubmissionRepository {
         transaction.commit().await?;
 
         Ok(Submission::from_db(&added_submission)?)
+    }
+
+    pub async fn revoke(
+        &self,
+        exchange_id: ExchangeId,
+        submitter: UserId,
+    ) -> Result<bool, anyhow::Error> {
+        let mut transaction = self.pool.begin().await?;
+
+        let exchange_id = exchange_id.to_db()?;
+        let submitter = submitter.to_db()?;
+        let accepting_submissions = ExchangeState::AcceptingSubmissions.to_db()?;
+        let result = query!(
+            r#"
+                DELETE FROM submissions
+                WHERE exchange_id = $1 AND submitter = $2
+                    AND EXISTS(SELECT 1 FROM exchanges 
+                        WHERE submissions.exchange_id = exchanges.id AND exchanges.state = $3)
+            "#,
+            exchange_id,
+            submitter,
+            accepting_submissions,
+        ).execute(&mut *transaction).await?;
+
+        transaction.commit().await?;
+        
+        Ok(result.rows_affected() > 0)
     }
 }
 

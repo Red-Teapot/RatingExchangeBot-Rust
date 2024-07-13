@@ -3,12 +3,14 @@ mod camel_slug;
 mod arguments;
 mod exchange;
 mod played;
+mod revoke;
 mod submit;
 
 use crate::BotState;
 
 pub use exchange::exchange;
 pub use played::played;
+pub use revoke::revoke;
 pub use submit::submit;
 
 type CommandResult = Result<(), CommandError>;

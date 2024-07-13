@@ -17,7 +17,9 @@ pub async fn played(
     let user = ctx.author().id;
 
     if JamType::iter().all(|jam_type| !jam_type.validate_entry_link(&link)) {
-        return Err(user_err("Invalid entry link, does not match any of known jams"));
+        return Err(user_err(
+            "Invalid entry link, does not match any of known jams",
+        ));
     }
 
     match ctx.data.played_game_repository.submit(user, &link).await {
