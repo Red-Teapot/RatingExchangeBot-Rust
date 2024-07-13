@@ -1,9 +1,7 @@
-use sqlx::Type;
 use std::ops::Add;
 use time::{Duration, OffsetDateTime, PrimitiveDateTime, UtcOffset};
 
-#[derive(Copy, Clone, Debug, Type)]
-#[sqlx(transparent)]
+#[derive(Copy, Clone, Debug)]
 pub struct UtcDateTime(PrimitiveDateTime);
 
 impl UtcDateTime {

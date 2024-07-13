@@ -84,7 +84,7 @@ async fn main() {
 
     let framework = Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![commands::exchange(), commands::submit()],
+            commands: vec![commands::exchange(), commands::submit(), commands::played()],
             on_error: |error| Box::pin(handle_error(error)),
             ..Default::default()
         })

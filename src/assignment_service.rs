@@ -149,14 +149,13 @@ impl AssignmentService {
                         r#"
                             # Review exchange {name} starts now!
 
-                            **Submit your jam entry using the `/submit {slug} <entry link>` command.**
+                            **Submit your jam entry using the `/submit <entry link>` command.**
 
                             The exchange ends on {end_local} your time or {end_utc} UTC. You should submit your entry before this deadline.
 
                             After the deadline, you will receive a list of entries to play and rate in your DMs.
                         "#,
                         name = exchange.display_name,
-                        slug = exchange.slug,
                         end_local = format_local(exchange.submissions_end),
                         end_utc = format_utc(exchange.submissions_end),
                     };

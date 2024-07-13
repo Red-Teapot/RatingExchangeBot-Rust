@@ -37,8 +37,8 @@ CREATE TABLE submissions (
 
 CREATE TABLE played_games (
     id INTEGER PRIMARY KEY NOT NULL,
-    link TEXT NOT NULL,
     member INTEGER NOT NULL,
+    link TEXT NOT NULL,
     is_manual INTEGER NOT NULL,
 
     CONSTRAINT uniq_link_member UNIQUE (link, member)

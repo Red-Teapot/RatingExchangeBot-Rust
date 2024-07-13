@@ -126,11 +126,11 @@ pub async fn create(
 
             for exchange in &overlapping_exchanges {
                 message += &format!(
-                    " - **{}** (slug: `{}`) - runs from {} UTC to {} UTC\n",
-                    exchange.display_name,
-                    exchange.slug,
-                    format_utc(exchange.submissions_start),
-                    format_utc(exchange.submissions_end),
+                    " - **{name}** (slug: `{slug}`) - runs from {start} UTC to {end} UTC\n",
+                    name = exchange.display_name,
+                    slug = exchange.slug,
+                    start = format_utc(exchange.submissions_start),
+                    end = format_utc(exchange.submissions_end),
                 );
             }
 
@@ -270,18 +270,18 @@ fn create_new_exchange_embed(exchange: &NewExchange, color: Color) -> CreateEmbe
         .field(
             "Start",
             format!(
-                "{} UTC or {} your time",
-                format_utc(exchange.submissions_start),
-                format_local(exchange.submissions_end),
+                "{local} your time or {utc} UTC",
+                local = format_local(exchange.submissions_start),
+                utc = format_utc(exchange.submissions_start),
             ),
             false,
         )
         .field(
             "End",
             format!(
-                "{} UTC or {} your time",
-                format_utc(exchange.submissions_end),
-                format_local(exchange.submissions_end),
+                "{local} your time or {utc} UTC",
+                local = format_local(exchange.submissions_end),
+                utc = format_utc(exchange.submissions_end),
             ),
             false,
         )

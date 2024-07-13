@@ -12,7 +12,6 @@ use crate::{
 #[poise::command(slash_command, rename = "submit")]
 pub async fn submit(
     ctx: ApplicationContext<'_>,
-    #[description = "Exchange slug"] slug: String,
     #[description = "Submission link"] link: String,
 ) -> CommandResult {
     let exchange = {
@@ -20,35 +19,25 @@ pub async fn submit(
         let channel_id = ctx.channel_id();
         let now = UtcDateTime::from(OffsetDateTime::now_utc());
 
+        debug!("Guild ID: {guild_id}, channel ID: {channel_id}, now: {now:?}");
+
         match ctx
             .data
             .exchange_repository
-            .get_overlapping_exchanges(guild_id, channel_id, &slug, now, now)
+            .get_running_exchange(guild_id, channel_id, now)
             .await
         {
-            Ok(exchanges) if exchanges.is_empty() => {
+            Ok(Some(exchange)) => exchange,
+
+            Ok(None) => {
                 let message = formatdoc! {
                     r#"
-                        **There are no active exchanges with slug `{slug}` in this channel.**
+                        **There are no currently active exchanges in this channel.**
 
                         Check the starting and ending dates of the exchanges and their submission channels.
                     "#,
-                    slug = slug,
                 };
                 return Err(user_err(message));
-            }
-
-            Ok(mut exchanges) if exchanges.len() == 1 => {
-                exchanges.pop().expect("Length is checked by guard")
-            }
-
-            Ok(exchanges) => {
-                let exchange_ids = exchanges
-                    .iter()
-                    .map(|e| format!("{:?}", e.id))
-                    .collect::<Vec<String>>()
-                    .join(", ");
-                return Err(internal_err(&format!("Too many exchanges: {exchange_ids}")));
             }
 
             Err(err) => {

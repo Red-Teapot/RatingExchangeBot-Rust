@@ -1,7 +1,8 @@
-use lazy_regex::regex_captures;
+use lazy_regex::{regex_captures, regex_is_match};
 use poise::ChoiceParameter;
+use strum::EnumIter;
 
-#[derive(ChoiceParameter, Copy, Clone, Debug)]
+#[derive(ChoiceParameter, Copy, Clone, Debug, EnumIter)]
 #[repr(i32)]
 pub enum JamType {
     #[name = "Itch.io jam"]
@@ -72,6 +73,25 @@ impl JamType {
 
                     slug => Some(format!("{jam_link}/{slug}")),
                 }
+            }
+        }
+    }
+
+    pub fn validate_entry_link(&self, entry_link: &str) -> bool {
+        use JamType::*;
+
+        match self {
+            Itch => {
+                regex_is_match!(
+                    r#"^https://itch\.io/jam/[a-z0-9_-]+/rate/([0-9]+)/?"#,
+                    entry_link
+                )
+            }
+            LudumDare => {
+                regex_is_match!(
+                    r#"^https://ldjam\.com/events/ludum-dare/[0-9]+/[a-z0-9]+/?"#,
+                    entry_link
+                )
             }
         }
     }

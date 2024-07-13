@@ -107,13 +107,15 @@ impl ExchangeRepository {
         let overlapping_exchanges = {
             let guild = guild.to_db()?;
             let channel = channel.to_db()?;
+            let start = start.to_db()?;
+            let end = end.to_db()?;
 
             query_as!(
                 SqlExchange,
                 r#"
                 SELECT * FROM exchanges
                 WHERE (guild = $1 AND channel = $2 AND submissions_start < $4 AND submissions_end > $3)
-                    OR (guild = $1 AND slug = $5 AND state <> 'AssignmentsSent' AND state <> 'MissedByBot')
+                    OR (guild = $1 AND slug = $5)
                 "#,
                 guild,
                 channel,
@@ -135,6 +137,46 @@ impl ExchangeRepository {
         Ok(overlapping_exchanges?)
     }
 
+    pub async fn get_running_exchange(
+        &self,
+        guild: GuildId,
+        channel: ChannelId,
+        date: UtcDateTime,
+    ) -> Result<Option<Exchange>, anyhow::Error> {
+        let mut transaction = self.pool.begin().await?;
+
+        let running_exchange = {
+            let guild = guild.to_db()?;
+            let channel = channel.to_db()?;
+            let date = date.to_db()?;
+            let accepting_submissions = ExchangeState::AcceptingSubmissions.to_db()?;
+
+            query_as!(
+                SqlExchange,
+                r#"
+                SELECT * FROM exchanges
+                WHERE guild = $1 
+                    AND channel = $2 
+                    AND submissions_start <= $3 
+                    AND submissions_end >= $3
+                    AND state = $4
+                "#,
+                guild,
+                channel,
+                date,
+                accepting_submissions,
+            )
+            .fetch_optional(&mut *transaction)
+            .await?
+        };
+
+        transaction.commit().await?;
+
+        Ok(running_exchange
+            .map(|e| Exchange::from_db(&e))
+            .transpose()?)
+    }
+
     pub async fn get_upcoming_exchanges_in_guild(
         &self,
         guild: GuildId,
@@ -144,6 +186,7 @@ impl ExchangeRepository {
 
         let upcoming_exchanges = {
             let guild = guild.to_db()?;
+            let after = after.to_db()?;
 
             query_as!(
                 SqlExchange,
