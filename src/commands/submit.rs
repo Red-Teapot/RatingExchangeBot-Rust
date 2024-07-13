@@ -32,7 +32,7 @@ pub async fn submit(
             Ok(None) => {
                 let message = formatdoc! {
                     r#"
-                        **There are no currently active exchanges in this channel.**
+                        # There are no currently active exchanges in this channel
 
                         Check the starting and ending dates of the exchanges and their submission channels.
                     "#,
@@ -60,7 +60,7 @@ pub async fn submit(
             None => {
                 let message = formatdoc! {
                     r#"
-                        **Your entry link is invalid.**
+                        # Your entry link is invalid
 
                         It should look like this: `{example}`.
 
@@ -82,7 +82,7 @@ pub async fn submit(
 
     let mut message: String = formatdoc! {
         r#"
-            **Submitted!**
+            # Submitted!
 
             You will receive your assignments in the DMs when the exchange ends: {end_local} your time or {end_utc} UTC.
         "#,
@@ -99,7 +99,7 @@ pub async fn submit(
         if submission.link == conflict.link {
             let message = formatdoc! {
                 r#"
-                    **Someone else has already submitted this link**
+                    # Someone else has already submitted this link
 
                     If you worked in a team, only one team member can submit an entry and get assignments.
                 "#,
@@ -110,7 +110,7 @@ pub async fn submit(
         if submission.submitter == conflict.submitter {
             message = formatdoc! {
                 r#"
-                    **Updated your submission**
+                    # Updated your submission
 
                     Previously submitted link: `{old_link}`.
 
