@@ -2,10 +2,10 @@ use poise::serenity_prelude::UserId;
 
 use super::{exchange::ExchangeId, types::UtcDateTime};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct SubmissionId(pub u64);
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Submission {
     pub id: SubmissionId,
     pub exchange_id: ExchangeId,

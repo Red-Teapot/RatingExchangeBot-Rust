@@ -2,7 +2,9 @@ use poise::serenity_prelude::UserId;
 use sqlx::{query, query_as, Pool, Sqlite};
 
 use crate::{
-    models::{types::UtcDateTime, ExchangeId, ExchangeState, NewSubmission, Submission, SubmissionId},
+    models::{
+        types::UtcDateTime, ExchangeId, ExchangeState, NewSubmission, Submission, SubmissionId,
+    },
     repository::conversion::DBConvertible,
 };
 
@@ -109,11 +111,41 @@ impl SubmissionRepository {
             exchange_id,
             submitter,
             accepting_submissions,
-        ).execute(&mut *transaction).await?;
+        )
+        .execute(&mut *transaction)
+        .await?;
 
         transaction.commit().await?;
-        
+
         Ok(result.rows_affected() > 0)
+    }
+
+    pub async fn get_submissions_for_exchange(
+        &self,
+        exchange_id: ExchangeId,
+    ) -> Result<Vec<Submission>, anyhow::Error> {
+        let mut transaction = self.pool.begin().await?;
+
+        let submissions = {
+            let exchange_id = exchange_id.to_db()?;
+
+            query_as!(
+                SqlSubmission,
+                r#"
+                    SELECT * FROM submissions WHERE exchange_id = $1
+                "#,
+                exchange_id,
+            )
+            .fetch_all(&mut *transaction)
+            .await?
+            .iter()
+            .map(|s| Submission::from_db(s))
+            .collect::<Result<Vec<Submission>, _>>()?
+        };
+
+        transaction.commit().await?;
+
+        Ok(submissions)
     }
 }
 
@@ -147,5 +179,148 @@ impl DBConvertible for Submission {
             submitter: UserId::from_db(&value.submitter)?,
             submitted_at: UtcDateTime::from_db(&value.submitted_at)?,
         })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use serenity::all::UserId;
+    use sqlx::{query, sqlite::SqlitePoolOptions, SqlitePool};
+    use time::macros::datetime;
+
+    use crate::{
+        models::{types::UtcDateTime, ExchangeId, Submission, SubmissionId},
+        repository::SubmissionRepository,
+    };
+
+    async fn setup_database() -> SqlitePool {
+        let pool = SqlitePoolOptions::new()
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        pool
+    }
+
+    #[tokio::test]
+    async fn no_submissions() {
+        let pool = setup_database().await;
+        let repository = SubmissionRepository::new(pool.clone());
+
+        {
+            let mut transaction = pool.begin().await.unwrap();
+
+            query!(
+                r#"
+                    INSERT INTO exchanges (id, guild, channel, jam_type, jam_link, slug, display_name, state, submissions_start, submissions_end, games_per_member) 
+                    VALUES (1, 2, 3, 'Itch', 'https://itch.io/jam/example-jam', 'Test', 'Test', 'AcceptingSubmissions', '2024-01-01T00:00:00.000000000Z', '2024-01-02T00:00:00.000000000Z', 5),
+                           (4, 5, 6, 'Itch', 'https://itch.io/jam/example-jam-2', 'Test2', 'Test 2', 'AcceptingSubmissions', '2024-01-01T00:00:00.000000000Z', '2024-01-02T00:00:00.000000000Z', 5);
+
+                    INSERT INTO submissions (id, exchange_id, link, submitter, submitted_at)
+                    VALUES (1, 4, 'https://itch.io/jam/example-jam-2/rate/000004', 7, '2024-01-01T00:01:00.000000000Z'),
+                           (2, 4, 'https://itch.io/jam/example-jam-2/rate/000005', 8, '2024-01-01T00:01:00.000000000Z');
+                "#
+            ).execute(&mut *transaction).await.unwrap();
+
+            transaction.commit().await.unwrap();
+        };
+
+        let submissions = repository
+            .get_submissions_for_exchange(ExchangeId(1))
+            .await
+            .unwrap();
+
+        assert!(submissions.is_empty());
+    }
+
+    #[tokio::test]
+    async fn one_submission() {
+        let pool = setup_database().await;
+        let repository = SubmissionRepository::new(pool.clone());
+
+        {
+            let mut transaction = pool.begin().await.unwrap();
+
+            query!(
+                r#"
+                    INSERT INTO exchanges (id, guild, channel, jam_type, jam_link, slug, display_name, state, submissions_start, submissions_end, games_per_member) 
+                    VALUES (1, 2, 3, 'Itch', 'https://itch.io/jam/example-jam', 'Test', 'Test', 'AcceptingSubmissions', '2024-01-01T00:00:00.000000000Z', '2024-01-02T00:00:00.000000000Z', 5),
+                           (4, 5, 6, 'Itch', 'https://itch.io/jam/example-jam-2', 'Test2', 'Test 2', 'AcceptingSubmissions', '2024-01-01T00:00:00.000000000Z', '2024-01-02T00:00:00.000000000Z', 5);
+
+                    INSERT INTO submissions (id, exchange_id, link, submitter, submitted_at)
+                    VALUES (1, 4, 'https://itch.io/jam/example-jam-2/rate/000004', 7, '2024-01-01T00:01:00.000000000Z'),
+                           (2, 4, 'https://itch.io/jam/example-jam-2/rate/000005', 8, '2024-01-01T00:01:00.000000000Z'),
+                           (3, 1, 'https://itch.io/jam/example-jam/rate/000003', 9, '2024-01-01T00:01:00.000000000Z');
+                "#
+            ).execute(&mut *transaction).await.unwrap();
+
+            transaction.commit().await.unwrap();
+        };
+
+        let submissions = repository
+            .get_submissions_for_exchange(ExchangeId(1))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            submissions,
+            vec![Submission {
+                id: SubmissionId(3),
+                exchange_id: ExchangeId(1),
+                link: "https://itch.io/jam/example-jam/rate/000003".to_string(),
+                submitter: UserId::new(9),
+                submitted_at: UtcDateTime::assume_utc(datetime!(2024-01-01 00:01:00.000000000)),
+            }]
+        );
+    }
+
+    #[tokio::test]
+    async fn multiple_submissions() {
+        let pool = setup_database().await;
+        let repository = SubmissionRepository::new(pool.clone());
+
+        {
+            let mut transaction = pool.begin().await.unwrap();
+
+            query!(
+                r#"
+                    INSERT INTO exchanges (id, guild, channel, jam_type, jam_link, slug, display_name, state, submissions_start, submissions_end, games_per_member) 
+                    VALUES (1, 2, 3, 'Itch', 'https://itch.io/jam/example-jam', 'Test', 'Test', 'AcceptingSubmissions', '2024-01-01T00:00:00.000000000Z', '2024-01-02T00:00:00.000000000Z', 5),
+                           (4, 5, 6, 'Itch', 'https://itch.io/jam/example-jam-2', 'Test2', 'Test 2', 'AcceptingSubmissions', '2024-01-01T00:00:00.000000000Z', '2024-01-02T00:00:00.000000000Z', 5);
+
+                    INSERT INTO submissions (id, exchange_id, link, submitter, submitted_at)
+                    VALUES (1, 4, 'https://itch.io/jam/example-jam-2/rate/000004', 7, '2024-01-01T00:01:00.000000000Z'),
+                           (2, 4, 'https://itch.io/jam/example-jam-2/rate/000005', 8, '2024-01-01T00:01:00.000000000Z'),
+                           (3, 1, 'https://itch.io/jam/example-jam/rate/000003', 9, '2024-01-01T00:01:00.000000000Z');
+                "#
+            ).execute(&mut *transaction).await.unwrap();
+
+            transaction.commit().await.unwrap();
+        };
+
+        let submissions = repository
+            .get_submissions_for_exchange(ExchangeId(4))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            submissions,
+            vec![
+                Submission {
+                    id: SubmissionId(1),
+                    exchange_id: ExchangeId(4),
+                    link: "https://itch.io/jam/example-jam-2/rate/000004".to_string(),
+                    submitter: UserId::new(7),
+                    submitted_at: UtcDateTime::assume_utc(datetime!(2024-01-01 00:01:00.000000000)),
+                },
+                Submission {
+                    id: SubmissionId(2),
+                    exchange_id: ExchangeId(4),
+                    link: "https://itch.io/jam/example-jam-2/rate/000005".to_string(),
+                    submitter: UserId::new(8),
+                    submitted_at: UtcDateTime::assume_utc(datetime!(2024-01-01 00:01:00.000000000)),
+                }
+            ]
+        );
     }
 }

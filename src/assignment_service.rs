@@ -4,14 +4,18 @@ use indoc::formatdoc;
 use serenity::http::Http;
 use time::{Duration, OffsetDateTime};
 use tokio::{runtime::Handle, select, sync::Notify};
-use tracing::{error, info, info_span, warn, Instrument};
+use tracing::{debug, error, info, info_span, warn, Instrument};
 
 use crate::{
-    models::types::UtcDateTime,
+    models::{types::UtcDateTime, Exchange},
     repository::{
         ExchangeRepository, ExchangeStorageEvent, PlayedGameRepository, SubmissionRepository,
     },
-    utils::formatting::{format_local, format_utc},
+    solver::dinic,
+    utils::{
+        assignment_network::AssignmentNetwork,
+        formatting::{format_local, format_utc},
+    },
 };
 
 pub struct AssignmentService {
@@ -210,7 +214,10 @@ impl AssignmentService {
                     );
                 }
             } else {
-                // TODO: Run the solver etc.
+                if let Err(err) = self.perform_assignments_for_exchange(&exchange).await {
+                    error!("Could not perform assignments for exchange {exchange:?}: {err}");
+                    continue;
+                }
 
                 {
                     let message = formatdoc! {
@@ -240,6 +247,69 @@ impl AssignmentService {
                     );
                 }
             }
+        }
+
+        Ok(())
+    }
+
+    async fn perform_assignments_for_exchange(
+        &self,
+        exchange: &Exchange,
+    ) -> Result<(), Box<dyn Error>> {
+        let submissions = self
+            .submission_repository
+            .get_submissions_for_exchange(exchange.id)
+            .await?;
+        let played_games = self
+            .played_game_repository
+            .get_played_games_for_exchange(exchange.id)
+            .await?;
+
+        let mut network = AssignmentNetwork::build(exchange, submissions, &played_games);
+
+        dinic::solve(&mut network.network);
+
+        debug!("Solved network: {network:?}");
+
+        let assignments = network.get_assignments();
+
+        for (user, assignments) in assignments {
+            let message = if assignments.is_empty() {
+                formatdoc! {
+                    r#"
+                        # Could not assign you any entries for {exchange_name}
+
+                        This probably means you have already played all entries for this exchange, or the algorithm could not find a solution.
+
+                        No actions are needed on your side.
+                    "#,
+                    exchange_name = exchange.display_name,
+                }
+            } else {
+                let assignments_str = assignments
+                    .iter()
+                    .map(|assignment| format!("- {}", assignment.link))
+                    .collect::<Vec<String>>()
+                    .join("\n");
+
+                formatdoc! {
+                    r#"
+                       # Here are your assignments
+
+                       {assignments_str}
+
+                       You are supposed to play and rate the assignments before the jam ends.
+
+                       If you decide to rate some entries outside of the assignments, you can use the `/played <entry link>` command.
+                       This will make sure these entries won't be assigned to you in the future.
+                    "#,
+                    assignments_str = assignments_str,
+                }
+            };
+
+            let channel = user.create_dm_channel(&self.http).await?;
+
+            channel.say(&self.http, message).await?;
         }
 
         Ok(())

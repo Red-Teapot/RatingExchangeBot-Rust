@@ -1,7 +1,7 @@
 use std::ops::Add;
 use time::{Duration, OffsetDateTime, PrimitiveDateTime, UtcOffset};
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct UtcDateTime(PrimitiveDateTime);
 
 impl UtcDateTime {

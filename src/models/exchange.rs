@@ -6,7 +6,7 @@ use crate::jam_types::JamType;
 
 use super::types::UtcDateTime;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ExchangeId(pub u64);
 
 #[derive(Debug)]

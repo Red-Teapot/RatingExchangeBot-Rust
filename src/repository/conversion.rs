@@ -6,7 +6,7 @@ use time::{format_description::well_known::Iso8601, OffsetDateTime};
 
 use crate::{
     jam_types::JamType,
-    models::{types::UtcDateTime, ExchangeId, ExchangeState, SubmissionId},
+    models::{types::UtcDateTime, ExchangeId, ExchangeState, PlayedGameId, SubmissionId},
 };
 
 pub trait DBConvertible: Sized {
@@ -69,6 +69,18 @@ impl DBConvertible for SubmissionId {
 
     fn from_db(value: &Self::DBType) -> Result<Self, DBFromConversionError> {
         Ok(SubmissionId(*value as _))
+    }
+}
+
+impl DBConvertible for PlayedGameId {
+    type DBType = i64;
+
+    fn to_db(&self) -> Result<Self::DBType, DBToConversionError> {
+        Ok(self.0 as _)
+    }
+
+    fn from_db(value: &Self::DBType) -> Result<Self, DBFromConversionError> {
+        Ok(PlayedGameId(*value as _))
     }
 }
 
