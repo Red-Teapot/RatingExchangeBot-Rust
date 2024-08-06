@@ -1,0 +1,80 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                INSERT INTO exchanges (\n                    guild,\n                    channel,\n                    jam_type,\n                    jam_link,\n                    slug,\n                    display_name,\n                    state,\n                    submissions_start,\n                    submissions_end,\n                    games_per_member)\n                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\n                RETURNING\n                    id AS \"id!\",\n                    guild AS \"guild!\",\n                    channel AS \"channel!\",\n                    jam_type AS \"jam_type!\",\n                    jam_link AS \"jam_link!\",\n                    slug AS \"slug!\",\n                    display_name AS \"display_name!\",\n                    state AS \"state!\",\n                    submissions_start AS \"submissions_start!\",\n                    submissions_end AS \"submissions_end!\",\n                    games_per_member AS \"games_per_member!\"\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "guild!",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "channel!",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "jam_type!",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "jam_link!",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "slug!",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "display_name!",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "state!",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "submissions_start!",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "submissions_end!",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "games_per_member!",
+        "ordinal": 10,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ee81df0aa0162ca9d2a159ee2e1949c611c5bcb6b01cabc8c97063995f5a213f"
+}

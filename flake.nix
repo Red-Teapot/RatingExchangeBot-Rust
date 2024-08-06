@@ -14,8 +14,26 @@
         pkgs = import nixpkgs {
           inherit system overlays;
         };
-      in with pkgs; {
-        devShells.default = mkShell {
+        rustPlatform = pkgs.makeRustPlatform {
+          cargo = pkgs.rust-bin.stable.latest.default;
+          rustc = pkgs.rust-bin.stable.latest.default;
+        };
+      in {
+        packages.default = rustPlatform.buildRustPackage {
+          pname = "rating-exchange-bot";
+          version = "0.1.0";
+          cargoLock.lockFile = ./Cargo.lock;
+          src = pkgs.lib.cleanSource ./.;
+
+          nativeBuildInputs = [
+            pkgs.openssl
+            pkgs.pkg-config
+          ];
+
+          PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
+        };
+      
+        devShells.default = with pkgs; mkShell {
           buildInputs = [
             openssl
             pkg-config

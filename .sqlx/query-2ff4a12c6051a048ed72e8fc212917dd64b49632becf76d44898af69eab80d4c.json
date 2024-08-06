@@ -1,0 +1,80 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT * FROM exchanges\n                WHERE state = $1 AND submissions_start <= $2\n                ORDER BY submissions_start, guild\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "guild",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "channel",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "jam_type",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "jam_link",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "slug",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "display_name",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "state",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "submissions_start",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "submissions_end",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "games_per_member",
+        "ordinal": 10,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "2ff4a12c6051a048ed72e8fc212917dd64b49632becf76d44898af69eab80d4c"
+}

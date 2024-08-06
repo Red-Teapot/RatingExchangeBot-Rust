@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                    SELECT * FROM submissions\n                    WHERE exchange_id = $1 AND (submitter = $2 OR link = $3)\n                    LIMIT 1\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "exchange_id",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "link",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "submitter",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "submitted_at",
+        "ordinal": 4,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4bb3729973870df453977d8ded950e66e5623dfad7ea6eb47e0b005b77cc8b87"
+}
