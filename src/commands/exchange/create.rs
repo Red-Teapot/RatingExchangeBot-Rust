@@ -148,7 +148,7 @@ pub async fn create(
         state: ExchangeState::NotStartedYet,
         submissions_start: start.into(),
         submissions_end: end.into(),
-        games_per_member: games_per_member,
+        games_per_member,
     };
 
     let confirm_timeout = Duration::minutes(5);
@@ -212,7 +212,7 @@ pub async fn create(
                         state: ExchangeState::NotStartedYet,
                         submissions_start: start.into(),
                         submissions_end: end.into(),
-                        games_per_member: games_per_member,
+                        games_per_member,
                     })
                     .await;
 

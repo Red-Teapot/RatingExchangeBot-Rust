@@ -32,17 +32,13 @@ impl AssignmentNetwork {
         };
 
         let submitter_played_games = {
-            let mut map = HashMap::new();
+            let mut map: HashMap<UserId, HashSet<String>> = HashMap::new();
 
             for played_game in played_games {
                 let member = played_game.member;
 
-                if !map.contains_key(&member) {
-                    map.insert(member, HashSet::new());
-                }
-
-                map.get_mut(&member)
-                    .expect("Checked separately")
+                map.entry(member)
+                    .or_default()
                     .insert(played_game.link.clone());
             }
 
@@ -127,7 +123,7 @@ impl AssignmentNetwork {
                 .filter(|&&edge| self.network.flow(edge) > 0)
                 .filter_map(|edge| self.submission_nodes.get_by_right(&edge.end))
                 .filter_map(|submission_id| self.submissions.get(submission_id))
-                .map(|submission| submission.clone())
+                .cloned()
                 .collect();
 
             map.insert(user_id, assignments);

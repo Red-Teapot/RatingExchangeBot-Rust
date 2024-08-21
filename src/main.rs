@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-#![allow(dead_code)] // TODO: Remove this before the first release.
+//#![forbid(clippy::unwrap_used)] // TODO: Enable this lint
 
 mod assignment_service;
 mod commands;
@@ -159,10 +159,6 @@ async fn main() {
             }
         },
     };
-}
-
-async fn run() -> Result<(), anyhow::Error> {
-    Ok(())
 }
 
 #[tracing::instrument(skip(url))]

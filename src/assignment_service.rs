@@ -1,13 +1,14 @@
 use std::{error::Error, sync::Arc, thread};
 
 use indoc::formatdoc;
+use poise::serenity_prelude::UserId;
 use serenity::http::Http;
 use time::{Duration, OffsetDateTime};
 use tokio::{runtime::Handle, select, sync::Notify};
 use tracing::{debug, error, info, info_span, warn, Instrument};
 
 use crate::{
-    models::{types::UtcDateTime, Exchange},
+    models::{types::UtcDateTime, Exchange, ExchangeState, Submission},
     repository::{
         ExchangeRepository, ExchangeStorageEvent, PlayedGameRepository, SubmissionRepository,
     },
@@ -139,7 +140,7 @@ impl AssignmentService {
                 );
                 if let Err(err) = self
                     .exchange_repository
-                    .update_exchange_state(exchange.id, crate::models::ExchangeState::MissedByBot)
+                    .update_exchange_state(exchange.id, ExchangeState::MissedByBot)
                     .await
                 {
                     warn!(
@@ -168,10 +169,7 @@ impl AssignmentService {
 
                 if let Err(err) = self
                     .exchange_repository
-                    .update_exchange_state(
-                        exchange.id,
-                        crate::models::ExchangeState::AcceptingSubmissions,
-                    )
+                    .update_exchange_state(exchange.id, ExchangeState::AcceptingSubmissions)
                     .await
                 {
                     warn!(
@@ -205,7 +203,7 @@ impl AssignmentService {
                 );
                 if let Err(err) = self
                     .exchange_repository
-                    .update_exchange_state(exchange.id, crate::models::ExchangeState::MissedByBot)
+                    .update_exchange_state(exchange.id, ExchangeState::MissedByBot)
                     .await
                 {
                     warn!(
@@ -216,6 +214,16 @@ impl AssignmentService {
             } else {
                 if let Err(err) = self.perform_assignments_for_exchange(&exchange).await {
                     error!("Could not perform assignments for exchange {exchange:?}: {err}");
+                    if let Err(err) = self
+                        .exchange_repository
+                        .update_exchange_state(exchange.id, ExchangeState::AssignmentError)
+                        .await
+                    {
+                        warn!(
+                            "Could not set exchange {:?} state to AssignmentError: {}",
+                            exchange.id, err
+                        );
+                    }
                     continue;
                 }
 
@@ -235,10 +243,7 @@ impl AssignmentService {
 
                 if let Err(err) = self
                     .exchange_repository
-                    .update_exchange_state(
-                        exchange.id,
-                        crate::models::ExchangeState::AssignmentsSent,
-                    )
+                    .update_exchange_state(exchange.id, ExchangeState::AssignmentsSent)
                     .await
                 {
                     warn!(
@@ -274,43 +279,59 @@ impl AssignmentService {
         let assignments = network.get_assignments();
 
         for (user, assignments) in assignments {
-            let message = if assignments.is_empty() {
-                formatdoc! {
-                    r#"
-                        # Could not assign you any entries for {exchange_name}
-
-                        This probably means you have already played all entries for this exchange, or the algorithm could not find a solution.
-
-                        No actions are needed on your side.
-                    "#,
-                    exchange_name = exchange.display_name,
-                }
-            } else {
-                let assignments_str = assignments
-                    .iter()
-                    .map(|assignment| format!("- {}", assignment.link))
-                    .collect::<Vec<String>>()
-                    .join("\n");
-
-                formatdoc! {
-                    r#"
-                       # Here are your assignments
-
-                       {assignments_str}
-
-                       You are supposed to play and rate the assignments before the jam ends.
-
-                       If you decide to rate some entries outside of the assignments, you can use the `/played <entry link>` command.
-                       This will make sure these entries won't be assigned to you in the future.
-                    "#,
-                    assignments_str = assignments_str,
-                }
-            };
-
-            let channel = user.create_dm_channel(&self.http).await?;
-
-            channel.say(&self.http, message).await?;
+            if let Err(err) = self
+                .send_user_assignments(exchange, user, &assignments)
+                .await
+            {
+                warn!("Could not send assignments to user {user}: {err}");
+            }
         }
+
+        Ok(())
+    }
+
+    async fn send_user_assignments(
+        &self,
+        exchange: &Exchange,
+        user: UserId,
+        assignments: &[Submission],
+    ) -> Result<(), Box<dyn Error>> {
+        let message = if assignments.is_empty() {
+            formatdoc! {
+                r#"
+                    # Could not assign you any entries for {exchange_name}
+
+                    This probably means you have already played all entries for this exchange, or the algorithm could not find a solution.
+
+                    No actions are needed on your side.
+                "#,
+                exchange_name = exchange.display_name,
+            }
+        } else {
+            let assignments_str = assignments
+                .iter()
+                .map(|assignment| format!("- {}", assignment.link))
+                .collect::<Vec<String>>()
+                .join("\n");
+
+            formatdoc! {
+                r#"
+                   # Here are your assignments
+
+                   {assignments_str}
+
+                   You are supposed to play and rate the assignments before the jam ends.
+
+                   If you decide to rate some entries outside of the assignments, you can use the `/played <entry link>` command.
+                   This will make sure these entries won't be assigned to you in the future.
+                "#,
+                assignments_str = assignments_str,
+            }
+        };
+
+        let channel = user.create_dm_channel(&self.http).await?;
+
+        channel.say(&self.http, message).await?;
 
         Ok(())
     }

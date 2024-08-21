@@ -67,9 +67,7 @@ impl JamType {
 
                 // Some slugs coincide with LD jam pages
                 match slug {
-                    "results" | "games" | "theme" | "stats" => None,
-
-                    slug if slug.is_empty() => None,
+                    "results" | "games" | "theme" | "stats" | "" => None,
 
                     slug => Some(format!("{jam_link}/{slug}")),
                 }

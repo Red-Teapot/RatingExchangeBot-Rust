@@ -56,7 +56,7 @@ impl PlayedGameRepository {
             .fetch_all(&mut *transaction)
             .await?
             .iter()
-            .map(|s| PlayedGame::from_db(s))
+            .map(PlayedGame::from_db)
             .collect::<Result<Vec<PlayedGame>, _>>()?
         };
 

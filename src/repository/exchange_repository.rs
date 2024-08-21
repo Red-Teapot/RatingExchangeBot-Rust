@@ -132,7 +132,7 @@ impl ExchangeRepository {
         let overlapping_exchanges: Result<Vec<Exchange>, DBFromConversionError> =
             overlapping_exchanges
                 .iter()
-                .map(|e| Exchange::from_db(e))
+                .map(Exchange::from_db)
                 .collect();
         Ok(overlapping_exchanges?)
     }
@@ -204,10 +204,8 @@ impl ExchangeRepository {
 
         transaction.commit().await?;
 
-        let upcoming_exchanges: Result<Vec<Exchange>, DBFromConversionError> = upcoming_exchanges
-            .iter()
-            .map(|e| Exchange::from_db(e))
-            .collect();
+        let upcoming_exchanges: Result<Vec<Exchange>, DBFromConversionError> =
+            upcoming_exchanges.iter().map(Exchange::from_db).collect();
         Ok(upcoming_exchanges?)
     }
 
@@ -237,10 +235,8 @@ impl ExchangeRepository {
 
         transaction.commit().await?;
 
-        let starting_exchanges: Result<Vec<Exchange>, DBFromConversionError> = starting_exchanges
-            .iter()
-            .map(|e| Exchange::from_db(e))
-            .collect();
+        let starting_exchanges: Result<Vec<Exchange>, DBFromConversionError> =
+            starting_exchanges.iter().map(Exchange::from_db).collect();
         Ok(starting_exchanges?)
     }
 
@@ -270,10 +266,8 @@ impl ExchangeRepository {
 
         transaction.commit().await?;
 
-        let ending_exchanges: Result<Vec<Exchange>, DBFromConversionError> = ending_exchanges
-            .iter()
-            .map(|e| Exchange::from_db(e))
-            .collect();
+        let ending_exchanges: Result<Vec<Exchange>, DBFromConversionError> =
+            ending_exchanges.iter().map(Exchange::from_db).collect();
         Ok(ending_exchanges?)
     }
 

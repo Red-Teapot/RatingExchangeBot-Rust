@@ -20,16 +20,16 @@ pub async fn handle_error(error: poise::FrameworkError<'_, BotState, CommandErro
         }
 
         Command { error, ctx, .. } => match error {
-            CommandError::UserError { message } => {
+            CommandError::User { message } => {
                 reply_with_error(ctx, &message).await;
             }
 
-            CommandError::InternalError { message } => {
+            CommandError::Internal { message } => {
                 reply_with_internal_error(ctx, &message).await;
                 error!("Internal error: {}", message);
             }
 
-            CommandError::SerenityError(error) => {
+            CommandError::Serenity(error) => {
                 reply_with_internal_error(ctx, &error.to_string()).await;
                 error!("Serenity error: {}", error);
             }
@@ -41,8 +41,7 @@ pub async fn handle_error(error: poise::FrameworkError<'_, BotState, CommandErro
             let usage = ctx
                 .command()
                 .help_text
-                .as_ref()
-                .map(|t| t.as_str())
+                .as_deref()
                 .unwrap_or("Please check the help menu or contact the admins.");
 
             let response = if let Some(input) = input {

@@ -20,21 +20,21 @@ type ApplicationContext<'a> = poise::ApplicationContext<'a, BotState, CommandErr
 #[derive(thiserror::Error, Debug)]
 pub enum CommandError {
     #[error("{message}")]
-    UserError { message: String },
+    User { message: String },
     #[error("{message}")]
-    InternalError { message: String },
+    Internal { message: String },
     #[error(transparent)]
-    SerenityError(#[from] serenity::Error),
+    Serenity(#[from] serenity::Error),
 }
 
 fn user_err(message: impl Into<String>) -> CommandError {
-    CommandError::UserError {
+    CommandError::User {
         message: message.into(),
     }
 }
 
 fn internal_err(message: impl Into<String>) -> CommandError {
-    CommandError::InternalError {
+    CommandError::Internal {
         message: message.into(),
     }
 }

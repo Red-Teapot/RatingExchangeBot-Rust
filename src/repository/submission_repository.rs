@@ -139,7 +139,7 @@ impl SubmissionRepository {
             .fetch_all(&mut *transaction)
             .await?
             .iter()
-            .map(|s| Submission::from_db(s))
+            .map(Submission::from_db)
             .collect::<Result<Vec<Submission>, _>>()?
         };
 

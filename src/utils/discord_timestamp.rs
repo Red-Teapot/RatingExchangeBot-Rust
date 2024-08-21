@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use time::OffsetDateTime;
 
+#[allow(dead_code)]
 pub enum TimestampStyle {
     /// Short time, e.g. `16:20`
     ShortTime,

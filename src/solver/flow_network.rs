@@ -66,12 +66,10 @@ impl FlowNetwork {
         self.capacities.insert(edge, capacity);
         self.flows.insert(edge, flow);
 
-        self.outgoing_edges
-            .entry(start)
-            .or_insert_with(HashSet::new);
+        self.outgoing_edges.entry(start).or_default();
         self.outgoing_edges.get_mut(&start).unwrap().insert(edge);
 
-        self.incoming_edges.entry(end).or_insert_with(HashSet::new);
+        self.incoming_edges.entry(end).or_default();
         self.incoming_edges.get_mut(&end).unwrap().insert(edge);
     }
 

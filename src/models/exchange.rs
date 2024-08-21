@@ -44,4 +44,5 @@ pub enum ExchangeState {
     AcceptingSubmissions,
     AssignmentsSent,
     MissedByBot,
+    AssignmentError,
 }

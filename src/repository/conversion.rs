@@ -42,7 +42,7 @@ impl DBConvertible for UtcDateTime {
     }
 
     fn from_db(db_value: &Self::DBType) -> Result<Self, DBFromConversionError> {
-        let datetime = OffsetDateTime::parse(&db_value, &Iso8601::DEFAULT)?;
+        let datetime = OffsetDateTime::parse(db_value, &Iso8601::DEFAULT)?;
         Ok(UtcDateTime::from(datetime))
     }
 }
@@ -129,6 +129,7 @@ impl DBConvertible for ExchangeState {
             ExchangeState::AcceptingSubmissions => "AcceptingSubmissions",
             ExchangeState::AssignmentsSent => "AssignmentsSent",
             ExchangeState::MissedByBot => "MissedByBot",
+            ExchangeState::AssignmentError => "AssignmentError",
         }
         .to_string())
     }
@@ -139,6 +140,7 @@ impl DBConvertible for ExchangeState {
             "AcceptingSubmissions" => Ok(ExchangeState::AcceptingSubmissions),
             "AssignmentsSent" => Ok(ExchangeState::AssignmentsSent),
             "MissedByBot" => Ok(ExchangeState::MissedByBot),
+            "AssignmentError" => Ok(ExchangeState::AssignmentError),
 
             unknown => Err(DBFromConversionError::NoSuchVariant(unknown.to_string())),
         }
