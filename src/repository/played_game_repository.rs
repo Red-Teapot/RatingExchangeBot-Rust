@@ -14,18 +14,24 @@ impl PlayedGameRepository {
         PlayedGameRepository { pool }
     }
 
-    pub async fn submit(&self, user: UserId, link: &str) -> Result<(), anyhow::Error> {
+    pub async fn submit(
+        &self,
+        user: UserId,
+        link: &str,
+        is_manual: bool,
+    ) -> Result<(), anyhow::Error> {
         let mut transaction = self.pool.begin().await?;
 
         let user = user.to_db()?;
         query!(
             r#"
                 INSERT INTO played_games (member, link, is_manual)
-                VALUES ($1, $2, TRUE)
+                VALUES ($1, $2, $3)
                 ON CONFLICT (member, link) DO NOTHING
             "#,
             user,
             link,
+            is_manual,
         )
         .execute(&mut *transaction)
         .await?;

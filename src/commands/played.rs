@@ -22,7 +22,12 @@ pub async fn played(
         ));
     }
 
-    match ctx.data.played_game_repository.submit(user, &link).await {
+    match ctx
+        .data
+        .played_game_repository
+        .submit(user, &link, true)
+        .await
+    {
         Ok(_) => {
             let message = formatdoc! {
                 r#"

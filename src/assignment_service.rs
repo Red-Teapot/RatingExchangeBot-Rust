@@ -284,6 +284,16 @@ impl AssignmentService {
                 .await
             {
                 warn!("Could not send assignments to user {user}: {err}");
+            } else {
+                for assignment in &assignments {
+                    let link = &assignment.link;
+
+                    if let Err(err) = self.played_game_repository.submit(user, link, false).await {
+                        warn!(
+                            "Could not register an assignment {link} as played for user {user}: {err}"
+                        );
+                    }
+                }
             }
         }
 
