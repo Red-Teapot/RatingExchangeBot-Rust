@@ -26,19 +26,31 @@
         ];
         src = pkgs.lib.cleanSource ./.;
       in {
-        packages.default = naersk'.buildPackage {
-          pname = "rating-exchange-bot";
-          version = "0.1.0";
-          src = src;
+        packages = rec {
+          executable = naersk'.buildPackage {
+            pname = "rating-exchange-bot";
+            version = "0.1.0";
+            src = src;
 
-          nativeBuildInputs = nativeBuildInputs ++ (with pkgs; [ sqlx-cli]);
+            nativeBuildInputs = nativeBuildInputs ++ (with pkgs; [ sqlx-cli ]);
 
-          PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
+            PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
 
-          preBuild = /* bash */ ''
-            export DATABASE_URL="sqlite:$(mktemp -d)/rebot-build.sqlite?mode=rwc"
-            sqlx database setup --source "${src}/migrations"
-          '';
+            preBuild = /* bash */ ''
+              export DATABASE_URL="sqlite:$(mktemp -d)/rebot-build.sqlite?mode=rwc"
+              sqlx database setup --source "${src}/migrations"
+            '';
+          };
+
+          container = pkgs.dockerTools.buildImage {
+            name = "rating-exchange-bot";
+
+            config = {
+              Entrypoint = [ "/bin/rating-exchange-bot" ];
+            };
+
+            copyToRoot = [ executable pkgs.cacert ];
+          };
         };
       
         devShells.default = pkgs.mkShell {
