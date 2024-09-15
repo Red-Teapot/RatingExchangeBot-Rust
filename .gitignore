@@ -4,5 +4,6 @@
 /.idea
 /.env
 *.sqlite
+*.sqlite3
 *.sqlite-shm
 *.sqlite-wal
