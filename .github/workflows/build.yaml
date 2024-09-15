@@ -42,4 +42,4 @@ jobs:
         run: nix build .#container
 
       - name: Upload the container image to GHCR
-        run: skopeo copy docker-archive:result docker://ghcr.io/${{ vars.DOCKER_IMAGE_NAME }}:latest --additional-tag $${{ vars.DOCKER_IMAGE_NAME }}:{{ github.ref_name }} 
+        run: skopeo copy docker-archive:result docker://ghcr.io/${{ vars.DOCKER_IMAGE_NAME }}:latest --additional-tag ${{ vars.DOCKER_IMAGE_NAME }}:${{ github.ref_name }} 
