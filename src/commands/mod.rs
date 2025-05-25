@@ -5,6 +5,7 @@ mod exchange;
 mod played;
 mod revoke;
 mod submit;
+mod view;
 
 use crate::BotState;
 
@@ -12,6 +13,7 @@ pub use exchange::exchange;
 pub use played::played;
 pub use revoke::revoke;
 pub use submit::submit;
+pub use view::view;
 
 type CommandResult = Result<(), CommandError>;
 type Context<'a> = poise::Context<'a, BotState, CommandError>;

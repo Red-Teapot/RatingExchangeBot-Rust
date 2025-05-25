@@ -10,7 +10,8 @@ use tracing::{debug, error, info, info_span, warn, Instrument};
 use crate::{
     models::{types::UtcDateTime, Exchange, ExchangeState, Submission},
     repository::{
-        ExchangeRepository, ExchangeStorageEvent, PlayedGameRepository, SubmissionRepository,
+        AssignmentRepository, ExchangeRepository, ExchangeStorageEvent, PlayedGameRepository,
+        SubmissionRepository,
     },
     solver::dinic,
     utils::{
@@ -25,6 +26,7 @@ pub struct AssignmentService {
     exchange_repository: Arc<ExchangeRepository>,
     submission_repository: Arc<SubmissionRepository>,
     played_game_repository: Arc<PlayedGameRepository>,
+    assignment_repository: Arc<AssignmentRepository>,
 }
 
 const DEFAULT_SLEEP_DURATION: Duration = Duration::seconds(60 * 60 /* One hour */);
@@ -38,6 +40,7 @@ impl AssignmentService {
         exchange_repository: Arc<ExchangeRepository>,
         submission_repository: Arc<SubmissionRepository>,
         played_game_repository: Arc<PlayedGameRepository>,
+        assignment_repository: Arc<AssignmentRepository>,
     ) {
         let service = AssignmentService {
             shutdown,
@@ -45,6 +48,7 @@ impl AssignmentService {
             exchange_repository,
             submission_repository,
             played_game_repository,
+            assignment_repository,
         };
 
         service.start();
@@ -234,9 +238,10 @@ impl AssignmentService {
 
                             **You should have received your assignments to play and rate in the DMs.**
 
-                            If that didn't happen, please contact the moderators.
+                            If that didn't happen, you DMs might be closed. If that's the case, use the `/view {exchange_slug}` command in this channel to see your assignments
                         "#,
                         name = exchange.display_name,
+                        exchange_slug = exchange.slug,
                     };
                     exchange.channel.say(&self.http, message).await?;
                 };
@@ -279,21 +284,29 @@ impl AssignmentService {
         let assignments = network.get_assignments();
 
         for (user, assignments) in assignments {
+            for assignment in &assignments {
+                let link = &assignment.link;
+
+                if let Err(err) = self.played_game_repository.submit(user, link, false).await {
+                    warn!(
+                        "Could not register an assignment {link} as played for user {user}: {err}"
+                    );
+                }
+
+                if let Err(err) = self
+                    .assignment_repository
+                    .add_assignment(exchange.id, assignment.id, user)
+                    .await
+                {
+                    warn!("Could not store the assignment: {err}");
+                }
+            }
+
             if let Err(err) = self
                 .send_user_assignments(exchange, user, &assignments)
                 .await
             {
                 warn!("Could not send assignments to user {user}: {err}");
-            } else {
-                for assignment in &assignments {
-                    let link = &assignment.link;
-
-                    if let Err(err) = self.played_game_repository.submit(user, link, false).await {
-                        warn!(
-                            "Could not register an assignment {link} as played for user {user}: {err}"
-                        );
-                    }
-                }
             }
         }
 

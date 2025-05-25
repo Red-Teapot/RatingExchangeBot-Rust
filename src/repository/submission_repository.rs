@@ -151,11 +151,11 @@ impl SubmissionRepository {
 
 #[derive(Debug)]
 pub struct SqlSubmission {
-    id: i64,
-    exchange_id: i64,
-    link: String,
-    submitter: i64,
-    submitted_at: String,
+    pub(super) id: i64,
+    pub(super) exchange_id: i64,
+    pub(super) link: String,
+    pub(super) submitter: i64,
+    pub(super) submitted_at: String,
 }
 
 impl DBConvertible for Submission {

@@ -305,6 +305,27 @@ impl ExchangeRepository {
         }
     }
 
+    pub async fn get_exchange_by_slug(&self, slug: &str) -> Result<Exchange, anyhow::Error> {
+        let mut transaction = self.pool.begin().await?;
+
+        let exchange = {
+            query_as!(
+                SqlExchange,
+                r#"
+                SELECT * FROM exchanges
+                WHERE slug = $1
+                "#,
+                slug,
+            )
+            .fetch_one(&mut *transaction)
+            .await?
+        };
+
+        transaction.commit().await?;
+
+        Ok(Exchange::from_db(&exchange)?)
+    }
+
     pub async fn update_exchange_state(
         &self,
         exchange_id: ExchangeId,

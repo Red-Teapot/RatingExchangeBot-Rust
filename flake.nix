@@ -79,7 +79,7 @@
         devShells.default = craneLib.devShell {
           checks = self.checks.${system};
           
-          packages = [ pkgs.sqlx-cli ];
+          packages = [ pkgs.sqlx-cli pkgs.sqlite-interactive ];
         };
       }
     );
