@@ -17,7 +17,8 @@ use assignment_service::AssignmentService;
 use poise::{serenity_prelude::*, Framework};
 use poise_error_handler::handle_error;
 use repository::{
-    AssignmentRepository, ExchangeRepository, PlayedGameRepository, SubmissionRepository,
+    AssignmentRepository, ExchangeRepository, PlayedGameRepository, SettingRepository,
+    SubmissionRepository,
 };
 use serde::Deserialize;
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
@@ -38,6 +39,7 @@ pub struct BotState {
     pub submission_repository: Arc<SubmissionRepository>,
     pub played_game_repository: Arc<PlayedGameRepository>,
     pub assignment_repository: Arc<AssignmentRepository>,
+    pub setting_repository: Arc<SettingRepository>,
 }
 
 #[tracing::instrument]
@@ -84,6 +86,7 @@ async fn main() {
         submission_repository: Arc::new(SubmissionRepository::new(db_pool.clone())),
         played_game_repository: Arc::new(PlayedGameRepository::new(db_pool.clone())),
         assignment_repository: Arc::new(AssignmentRepository::new(db_pool.clone())),
+        setting_repository: Arc::new(SettingRepository::new(db_pool.clone())),
     };
 
     let framework = Framework::builder()
