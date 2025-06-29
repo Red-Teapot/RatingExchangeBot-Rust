@@ -1,20 +1,16 @@
-FROM rust:latest AS builder
-
-WORKDIR /
-
-RUN cargo new app
-
+FROM lukemathwalker/cargo-chef:0.1.67-rust-1.80.0 AS chef
 WORKDIR /app
 
-COPY rust-toolchain.toml Cargo.toml Cargo.lock ./
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
 
-RUN cargo build --release
+FROM chef AS builder
+COPY --from=planner /app/recipe.json recipe.json
 
-RUN rm -r src target/release/rating-exchange-bot
+RUN cargo chef cook --release --recipe-path recipe.json
 
-COPY migrations ./migrations
-
-COPY src ./src
+COPY . .
 
 RUN DATABASE_URL="sqlite://rebot.sqlite3?mode=rwc" cargo build --release
 
