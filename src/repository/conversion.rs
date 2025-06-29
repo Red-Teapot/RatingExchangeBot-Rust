@@ -1,6 +1,6 @@
 use std::num::NonZeroU8;
 
-use poise::serenity_prelude::{ChannelId, GuildId, UserId};
+use poise::serenity_prelude::{ChannelId, GuildId, MessageId, UserId};
 use thiserror::Error;
 use time::{format_description::well_known::Iso8601, OffsetDateTime};
 
@@ -117,6 +117,18 @@ impl DBConvertible for ChannelId {
 
     fn from_db(value: &Self::DBType) -> Result<Self, DBFromConversionError> {
         Ok(ChannelId::new(*value as _))
+    }
+}
+
+impl DBConvertible for MessageId {
+    type DBType = i64;
+
+    fn to_db(&self) -> Result<Self::DBType, DBToConversionError> {
+        Ok(self.get() as _)
+    }
+
+    fn from_db(value: &Self::DBType) -> Result<Self, DBFromConversionError> {
+        Ok(MessageId::new(*value as _))
     }
 }
 

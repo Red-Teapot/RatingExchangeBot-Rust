@@ -2,16 +2,16 @@ use std::{error::Error, sync::Arc, thread};
 
 use indoc::formatdoc;
 use poise::serenity_prelude::UserId;
-use serenity::http::Http;
+use serenity::{all::EditMessage, http::Http};
 use time::{Duration, OffsetDateTime};
 use tokio::{runtime::Handle, select, sync::Notify};
 use tracing::{debug, error, info, info_span, warn, Instrument};
 
 use crate::{
-    models::{types::UtcDateTime, Exchange, ExchangeState, Submission},
+    models::{types::UtcDateTime, Exchange, ExchangeId, ExchangeState, Submission},
     repository::{
-        AssignmentRepository, ExchangeRepository, ExchangeStorageEvent, PlayedGameRepository,
-        SubmissionRepository,
+        AssignmentRepository, ExchangeRepository, ExchangeRepositoryEvent, PlayedGameRepository,
+        SubmissionRepository, SubmissionRepositoryEvent,
     },
     solver::dinic,
     utils::{
@@ -62,6 +62,7 @@ impl AssignmentService {
                 let mut next_assignments_time = Some(OffsetDateTime::now_utc());
 
                 let mut exchange_events = self.exchange_repository.subscribe();
+                let mut submission_events = self.submission_repository.subscribe();
                 let shutdown_notify = self.shutdown.clone();
 
                 loop {
@@ -106,7 +107,7 @@ impl AssignmentService {
 
                         evt = exchange_events.recv() => {
                             match evt {
-                                Ok(ExchangeStorageEvent::ExchangesUpdated) => {
+                                Ok(ExchangeRepositoryEvent::ExchangesUpdated) => {
                                     next_assignments_time = match self.reschedule().await {
                                         Ok(time) => time,
                                         Err(err) => {
@@ -116,6 +117,18 @@ impl AssignmentService {
                                     };
                                 },
                                 Err(err) => error!("Error while receiving an exchange event: {err:?}"),
+                            }
+                        }
+
+                        evt = submission_events.recv() => {
+                            match evt {
+                                Ok(SubmissionRepositoryEvent::SubmissionsUpdated { exchange_id }) => {
+                                    if let Err(err) = self.update_exchange_announcement(exchange_id).await {
+                                        error!("Could not update exchange announcement: {err:?}");
+                                    }
+                                },
+
+                                Err(err) => error!("Error while receiving a submission event: {err:?}"),
                             }
                         }
                     }
@@ -154,21 +167,23 @@ impl AssignmentService {
                 }
             } else {
                 {
-                    let message = formatdoc! {
-                        r#"
-                            # Review exchange {name} starts now!
+                    let message = exchange_start_announcement(&exchange, 0);
 
-                            **Submit your jam entry using the `/submit <entry link>` command.**
+                    let message_result = exchange.channel.say(&self.http, message).await?;
 
-                            The exchange ends on {end_local} your time or {end_utc} UTC. You should submit your entry before this deadline.
-
-                            After the deadline, you will receive a list of entries to play and rate in your DMs.
-                        "#,
-                        name = exchange.display_name,
-                        end_local = format_local(exchange.submissions_end),
-                        end_utc = format_utc(exchange.submissions_end),
-                    };
-                    exchange.channel.say(&self.http, message).await?;
+                    if let Err(err) = self
+                        .exchange_repository
+                        .update_exchange_start_announcement_message(
+                            exchange.id,
+                            Some(message_result.id),
+                        )
+                        .await
+                    {
+                        warn!(
+                            "Could not update exchange {:?} start announcement message: {}",
+                            exchange.id, err
+                        );
+                    }
                 };
 
                 if let Err(err) = self
@@ -359,6 +374,31 @@ impl AssignmentService {
         Ok(())
     }
 
+    async fn update_exchange_announcement(
+        &self,
+        exchange_id: ExchangeId,
+    ) -> Result<(), Box<dyn Error>> {
+        let exchange = self
+            .exchange_repository
+            .get_exchange_by_id(exchange_id)
+            .await?;
+        let submission_count = self
+            .exchange_repository
+            .get_submission_count(exchange_id)
+            .await?;
+
+        if let Some(message_id) = exchange.start_announcement_message {
+            let updated_message = EditMessage::new()
+                .content(exchange_start_announcement(&exchange, submission_count));
+            exchange
+                .channel
+                .edit_message(&self.http, message_id, updated_message)
+                .await?;
+        }
+
+        Ok(())
+    }
+
     #[tracing::instrument(skip(self))]
     async fn reschedule(&self) -> Result<Option<OffsetDateTime>, Box<dyn Error>> {
         info!("Rescheduling");
@@ -372,5 +412,25 @@ impl AssignmentService {
             Ok(None) => Ok(None),
             Err(err) => Err(err.into()),
         }
+    }
+}
+
+fn exchange_start_announcement(exchange: &Exchange, submissions: u32) -> String {
+    formatdoc! {
+        r#"
+            # Review exchange {name} starts now!
+
+            **Submit your jam entry using the `/submit <entry link>` command.**
+
+            The exchange ends on {end_local} your time or {end_utc} UTC. You should submit your entry before this deadline.
+
+            After the deadline, you will receive a list of entries to play and rate in your DMs.
+
+            Current submissions: {submissions}.
+        "#,
+        name = exchange.display_name,
+        end_local = format_local(exchange.submissions_end),
+        end_utc = format_utc(exchange.submissions_end),
+        submissions = submissions,
     }
 }

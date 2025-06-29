@@ -5,6 +5,6 @@ mod played_game_repository;
 mod submission_repository;
 
 pub use assignment_repository::AssignmentRepository;
-pub use exchange_repository::{ExchangeRepository, ExchangeStorageEvent};
+pub use exchange_repository::{ExchangeRepository, ExchangeRepositoryEvent};
 pub use played_game_repository::PlayedGameRepository;
-pub use submission_repository::SubmissionRepository;
+pub use submission_repository::{SubmissionRepository, SubmissionRepositoryEvent};

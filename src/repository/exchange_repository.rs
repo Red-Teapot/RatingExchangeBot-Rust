@@ -1,6 +1,6 @@
 use std::num::NonZeroU8;
 
-use poise::serenity_prelude::{ChannelId, GuildId};
+use poise::serenity_prelude::{ChannelId, GuildId, MessageId};
 use sqlx::{query, query_as, query_scalar, Pool, Sqlite};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tracing::warn;
@@ -15,11 +15,11 @@ use super::conversion::{DBConvertible, DBFromConversionError};
 #[derive(Debug)]
 pub struct ExchangeRepository {
     pool: Pool<Sqlite>,
-    events: Sender<ExchangeStorageEvent>,
+    events: Sender<ExchangeRepositoryEvent>,
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum ExchangeStorageEvent {
+pub enum ExchangeRepositoryEvent {
     ExchangesUpdated,
 }
 
@@ -69,7 +69,8 @@ impl ExchangeRepository {
                     state AS "state!",
                     submissions_start AS "submissions_start!",
                     submissions_end AS "submissions_end!",
-                    games_per_member AS "games_per_member!"
+                    games_per_member AS "games_per_member!",
+                    start_announcement_message AS "start_announcement_message!"
                 "#,
                 guild,
                 channel,
@@ -89,7 +90,7 @@ impl ExchangeRepository {
         transaction.commit().await?;
 
         // Don't care if it actually gets received
-        let _ = self.events.send(ExchangeStorageEvent::ExchangesUpdated);
+        let _ = self.events.send(ExchangeRepositoryEvent::ExchangesUpdated);
 
         Ok(Exchange::from_db(&created_exchange)?)
     }
@@ -326,6 +327,52 @@ impl ExchangeRepository {
         Ok(Exchange::from_db(&exchange)?)
     }
 
+    pub async fn get_exchange_by_id(&self, id: ExchangeId) -> Result<Exchange, anyhow::Error> {
+        let mut transaction = self.pool.begin().await?;
+
+        let exchange = {
+            let id = id.to_db()?;
+            query_as!(
+                SqlExchange,
+                r#"
+                SELECT * FROM exchanges
+                WHERE id = $1
+                "#,
+                id,
+            )
+            .fetch_one(&mut *transaction)
+            .await?
+        };
+
+        transaction.commit().await?;
+
+        Ok(Exchange::from_db(&exchange)?)
+    }
+
+    pub async fn update_exchange_start_announcement_message(
+        &self,
+        exchange_id: ExchangeId,
+        announcement_message: Option<MessageId>,
+    ) -> Result<(), anyhow::Error> {
+        let mut transaction = self.pool.begin().await?;
+        let exchange_id = exchange_id.to_db()?;
+        let announcement_message = announcement_message.map(|m| m.to_db()).transpose()?;
+
+        query!(
+            r#"
+            UPDATE exchanges SET start_announcement_message = $1 WHERE id = $2    
+            "#,
+            announcement_message,
+            exchange_id,
+        )
+        .execute(&mut *transaction)
+        .await?;
+
+        transaction.commit().await?;
+
+        Ok(())
+    }
+
     pub async fn update_exchange_state(
         &self,
         exchange_id: ExchangeId,
@@ -364,7 +411,7 @@ impl ExchangeRepository {
 
         transaction.commit().await?;
 
-        let _ = self.events.send(ExchangeStorageEvent::ExchangesUpdated); // Don't care if it actually gets received
+        let _ = self.events.send(ExchangeRepositoryEvent::ExchangesUpdated); // Don't care if it actually gets received
 
         let exchanges_deleted = query_result.rows_affected();
 
@@ -375,7 +422,32 @@ impl ExchangeRepository {
         Ok(exchanges_deleted > 0)
     }
 
-    pub fn subscribe(&self) -> Receiver<ExchangeStorageEvent> {
+    pub async fn get_submission_count(
+        &self,
+        exchange_id: ExchangeId,
+    ) -> Result<u32, anyhow::Error> {
+        let mut transaction = self.pool.begin().await?;
+
+        let result = {
+            let exchange_id = exchange_id.to_db()?;
+            query!(
+                r#"
+                SELECT COUNT(1) as count FROM submissions
+                WHERE exchange_id = $1
+                "#,
+                exchange_id,
+            )
+            .fetch_one(&mut *transaction)
+            .await?
+            .count
+        };
+
+        transaction.commit().await?;
+
+        Ok(result.try_into()?)
+    }
+
+    pub fn subscribe(&self) -> Receiver<ExchangeRepositoryEvent> {
         self.events.subscribe()
     }
 }
@@ -392,6 +464,7 @@ pub struct SqlExchange {
     submissions_start: String,
     submissions_end: String,
     games_per_member: i64,
+    start_announcement_message: Option<i64>,
 }
 
 impl DBConvertible for Exchange {
@@ -410,6 +483,10 @@ impl DBConvertible for Exchange {
             submissions_start: self.submissions_start.to_db()?,
             submissions_end: self.submissions_end.to_db()?,
             games_per_member: self.games_per_member.to_db()?,
+            start_announcement_message: self
+                .start_announcement_message
+                .map(|m| m.to_db())
+                .transpose()?,
         })
     }
 
@@ -426,6 +503,11 @@ impl DBConvertible for Exchange {
             submissions_start: UtcDateTime::from_db(&value.submissions_start)?,
             submissions_end: UtcDateTime::from_db(&value.submissions_end)?,
             games_per_member: NonZeroU8::from_db(&value.games_per_member)?,
+            start_announcement_message: value
+                .start_announcement_message
+                .filter(|x| *x != 0)
+                .map(|m| MessageId::from_db(&m))
+                .transpose()?,
         })
     }
 }

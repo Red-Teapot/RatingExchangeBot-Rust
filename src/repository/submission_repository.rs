@@ -1,5 +1,6 @@
 use poise::serenity_prelude::UserId;
 use sqlx::{query, query_as, Pool, Sqlite};
+use tokio::sync::broadcast::{Receiver, Sender};
 
 use crate::{
     models::{
@@ -12,11 +13,20 @@ use super::conversion::{DBFromConversionError, DBToConversionError};
 
 pub struct SubmissionRepository {
     pool: Pool<Sqlite>,
+    events: Sender<SubmissionRepositoryEvent>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum SubmissionRepositoryEvent {
+    SubmissionsUpdated { exchange_id: ExchangeId },
 }
 
 impl SubmissionRepository {
     pub fn new(pool: Pool<Sqlite>) -> SubmissionRepository {
-        SubmissionRepository { pool }
+        SubmissionRepository {
+            pool,
+            events: tokio::sync::broadcast::channel(128).0,
+        }
     }
 
     pub async fn get_conflicting_submission(
@@ -88,6 +98,13 @@ impl SubmissionRepository {
 
         transaction.commit().await?;
 
+        // Don't care if it actually gets received
+        let _ = self
+            .events
+            .send(SubmissionRepositoryEvent::SubmissionsUpdated {
+                exchange_id: submission.exchange_id,
+            });
+
         Ok(Submission::from_db(&added_submission)?)
     }
 
@@ -98,24 +115,31 @@ impl SubmissionRepository {
     ) -> Result<bool, anyhow::Error> {
         let mut transaction = self.pool.begin().await?;
 
-        let exchange_id = exchange_id.to_db()?;
-        let submitter = submitter.to_db()?;
-        let accepting_submissions = ExchangeState::AcceptingSubmissions.to_db()?;
-        let result = query!(
-            r#"
-                DELETE FROM submissions
-                WHERE exchange_id = $1 AND submitter = $2
-                    AND EXISTS(SELECT 1 FROM exchanges 
-                        WHERE submissions.exchange_id = exchanges.id AND exchanges.state = $3)
-            "#,
-            exchange_id,
-            submitter,
-            accepting_submissions,
-        )
-        .execute(&mut *transaction)
-        .await?;
+        let result = {
+            let exchange_id = exchange_id.to_db()?;
+            let submitter = submitter.to_db()?;
+            let accepting_submissions = ExchangeState::AcceptingSubmissions.to_db()?;
+            query!(
+                r#"
+                    DELETE FROM submissions
+                    WHERE exchange_id = $1 AND submitter = $2
+                        AND EXISTS(SELECT 1 FROM exchanges 
+                            WHERE submissions.exchange_id = exchanges.id AND exchanges.state = $3)
+                "#,
+                exchange_id,
+                submitter,
+                accepting_submissions,
+            )
+            .execute(&mut *transaction)
+            .await?
+        };
 
         transaction.commit().await?;
+
+        // Don't care if it actually gets received
+        let _ = self
+            .events
+            .send(SubmissionRepositoryEvent::SubmissionsUpdated { exchange_id });
 
         Ok(result.rows_affected() > 0)
     }
@@ -146,6 +170,10 @@ impl SubmissionRepository {
         transaction.commit().await?;
 
         Ok(submissions)
+    }
+
+    pub fn subscribe(&self) -> Receiver<SubmissionRepositoryEvent> {
+        self.events.subscribe()
     }
 }
 
