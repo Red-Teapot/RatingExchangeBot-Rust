@@ -1,6 +1,7 @@
 use std::error::Error;
 
 use poise::serenity_prelude::GuildId;
+use serenity::all::RoleId;
 use sqlx::{query, Pool, Sqlite};
 
 use crate::repository::conversion::DBConvertible;
@@ -72,4 +73,22 @@ pub trait Setting: Sized {
 
     fn to_db(&self) -> Result<String, Box<dyn Error>>;
     fn from_db(value: &str) -> Result<Self, Box<dyn Error>>;
+}
+
+pub struct ManagerRole {
+    pub role: RoleId,
+}
+
+impl Setting for ManagerRole {
+    const KEY: &'static str = "ManagerRole";
+
+    fn to_db(&self) -> Result<String, Box<dyn Error>> {
+        Ok(format!("{}", self.role.get()))
+    }
+
+    fn from_db(value: &str) -> Result<Self, Box<dyn Error>> {
+        Ok(ManagerRole {
+            role: RoleId::new(value.parse()?),
+        })
+    }
 }
