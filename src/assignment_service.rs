@@ -1,7 +1,7 @@
 use std::{error::Error, sync::Arc, thread};
 
 use indoc::formatdoc;
-use poise::serenity_prelude::UserId;
+use poise::serenity_prelude::{Mention, UserId};
 use serenity::{all::EditMessage, http::Http};
 use time::{Duration, OffsetDateTime};
 use tokio::{runtime::Handle, select, sync::Notify};
@@ -254,9 +254,15 @@ impl AssignmentService {
                             **You should have received your assignments to play and rate in the DMs.**
 
                             If that didn't happen, you DMs might be closed. If that's the case, use the `/view {exchange_slug}` command in this channel to see your assignments
+
+                            {ping_role}
                         "#,
                         name = exchange.display_name,
                         exchange_slug = exchange.slug,
+                        ping_role = match exchange.ping_role {
+                            Some(role) => Mention::from(role).to_string(),
+                            None => "".to_string(),
+                        },
                     };
                     exchange.channel.say(&self.http, message).await?;
                 };
@@ -427,10 +433,16 @@ fn exchange_start_announcement(exchange: &Exchange, submissions: u32) -> String 
             After the deadline, you will receive a list of entries to play and rate in your DMs.
 
             Current submissions: {submissions}.
+
+            {ping_role}
         "#,
         name = exchange.display_name,
         end_local = format_local(exchange.submissions_end),
         end_utc = format_utc(exchange.submissions_end),
         submissions = submissions,
+        ping_role = match exchange.ping_role {
+            Some(role) => Mention::from(role).to_string(),
+            None => "".to_string(),
+        },
     }
 }

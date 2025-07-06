@@ -1,6 +1,6 @@
 use std::num::NonZeroU8;
 
-use poise::serenity_prelude::{ChannelId, GuildId, MessageId};
+use poise::serenity_prelude::{ChannelId, GuildId, MessageId, RoleId};
 
 use crate::jam_types::JamType;
 
@@ -23,6 +23,7 @@ pub struct Exchange {
     pub submissions_end: UtcDateTime,
     pub games_per_member: NonZeroU8,
     pub start_announcement_message: Option<MessageId>,
+    pub ping_role: Option<RoleId>,
 }
 
 #[derive(Debug)]
@@ -37,6 +38,7 @@ pub struct NewExchange {
     pub submissions_start: UtcDateTime,
     pub submissions_end: UtcDateTime,
     pub games_per_member: NonZeroU8,
+    pub ping_role: Option<RoleId>,
 }
 
 #[derive(Clone, Copy, Debug)]

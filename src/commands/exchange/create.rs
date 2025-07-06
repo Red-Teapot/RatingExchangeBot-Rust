@@ -2,8 +2,7 @@ use std::num::NonZeroU8;
 use std::str::FromStr;
 
 use indoc::formatdoc;
-use poise::serenity_prelude::Mentionable;
-use poise::serenity_prelude::{ButtonStyle, Channel};
+use poise::serenity_prelude::{ButtonStyle, Channel, Mention, Mentionable, RoleId};
 use poise::{ChoiceParameter, CreateReply};
 use serenity::all::{Color, CreateActionRow, CreateButton};
 use serenity::builder::CreateEmbed;
@@ -56,6 +55,8 @@ pub async fn create(
 
     #[description = "The name of the exchange to use in commands. Must consist only of `A-Za-z0-9_-`."]
     slug: Option<ExchangeSlug>,
+
+    #[description = "The role to ping when the exchange starts or ends"] ping_role: Option<RoleId>,
 ) -> CommandResult {
     // To validate the jam link, we need to know the jam type. So, we do it here.
     let jam_link = jam_type
@@ -149,6 +150,7 @@ pub async fn create(
         submissions_start: start.into(),
         submissions_end: end.into(),
         games_per_member,
+        ping_role,
     };
 
     let confirm_timeout = Duration::minutes(5);
@@ -191,7 +193,7 @@ pub async fn create(
                     .edit(
                         ctx.into(),
                         CreateReply::default()
-                            .content("# Canceled!")
+                            .content("# Cancelled!")
                             .components(vec![])
                             .embed(create_new_exchange_embed(&new_exchange, Color::RED)),
                     )
@@ -213,6 +215,7 @@ pub async fn create(
                         submissions_start: start.into(),
                         submissions_end: end.into(),
                         games_per_member,
+                        ping_role,
                     })
                     .await;
 
@@ -260,12 +263,21 @@ fn create_new_exchange_embed(exchange: &NewExchange, color: Color) -> CreateEmbe
     CreateEmbed::default()
         .title(&exchange.display_name)
         .color(color)
+        .field("Exchange slug", format!("`{}`", exchange.slug), true)
         .field("Jam type", exchange.jam_type.name(), true)
         .field("Jam link", &exchange.jam_link, true)
         .field(
             "Submission channel",
             exchange.channel.mention().to_string(),
-            false,
+            true,
+        )
+        .field(
+            "Ping role",
+            match exchange.ping_role {
+                Some(role) => Mention::from(role).to_string(),
+                None => "None".to_string(),
+            },
+            true,
         )
         .field(
             "Start",
@@ -291,5 +303,4 @@ fn create_new_exchange_embed(exchange: &NewExchange, color: Color) -> CreateEmbe
             exchange.games_per_member.to_string(),
             true,
         )
-        .field("Slug", format!("`{}`", exchange.slug), true)
 }

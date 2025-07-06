@@ -184,6 +184,7 @@ mod test {
             submissions_end: UtcDateTime::assume_utc(datetime!(2024-01-01 13:00:00)),
             games_per_member: NonZero::new(5).unwrap(),
             start_announcement_message: None,
+            ping_role: None,
         };
         let submissions = vec![];
         let played_games = vec![];
@@ -211,6 +212,7 @@ mod test {
             submissions_end: UtcDateTime::assume_utc(datetime!(2024-01-01 13:00:00)),
             games_per_member: NonZero::new(5).unwrap(),
             start_announcement_message: None,
+            ping_role: None,
         };
         let submissions = vec![Submission {
             id: SubmissionId(1),
@@ -260,6 +262,7 @@ mod test {
             submissions_end: UtcDateTime::assume_utc(datetime!(2024-01-01 13:00:00)),
             games_per_member: NonZero::new(3).unwrap(),
             start_announcement_message: None,
+            ping_role: None,
         };
         let submissions = vec![
             Submission {

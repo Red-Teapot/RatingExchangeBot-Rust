@@ -1,6 +1,6 @@
 use std::num::NonZeroU8;
 
-use poise::serenity_prelude::{ChannelId, GuildId, MessageId};
+use poise::serenity_prelude::{ChannelId, GuildId, MessageId, RoleId};
 use sqlx::{query, query_as, query_scalar, Pool, Sqlite};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tracing::warn;
@@ -42,6 +42,7 @@ impl ExchangeRepository {
             let submissions_start = exchange.submissions_start.to_db()?;
             let submissions_end = exchange.submissions_end.to_db()?;
             let games_per_member = exchange.games_per_member.to_db()?;
+            let ping_role = exchange.ping_role.map(|r| r.to_db()).transpose()?;
 
             query_as!(
                 SqlExchange,
@@ -56,21 +57,10 @@ impl ExchangeRepository {
                     state,
                     submissions_start,
                     submissions_end,
-                    games_per_member)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-                RETURNING
-                    id AS "id!",
-                    guild AS "guild!",
-                    channel AS "channel!",
-                    jam_type AS "jam_type!",
-                    jam_link AS "jam_link!",
-                    slug AS "slug!",
-                    display_name AS "display_name!",
-                    state AS "state!",
-                    submissions_start AS "submissions_start!",
-                    submissions_end AS "submissions_end!",
-                    games_per_member AS "games_per_member!",
-                    start_announcement_message AS "start_announcement_message!"
+                    games_per_member,
+                    ping_role)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                RETURNING *
                 "#,
                 guild,
                 channel,
@@ -82,6 +72,7 @@ impl ExchangeRepository {
                 submissions_start,
                 submissions_end,
                 games_per_member,
+                ping_role,
             )
             .fetch_one(&mut *transaction)
             .await?
@@ -156,9 +147,9 @@ impl ExchangeRepository {
                 SqlExchange,
                 r#"
                 SELECT * FROM exchanges
-                WHERE guild = $1 
-                    AND channel = $2 
-                    AND submissions_start <= $3 
+                WHERE guild = $1
+                    AND channel = $2
+                    AND submissions_start <= $3
                     AND submissions_end >= $3
                     AND state = $4
                 "#,
@@ -360,7 +351,7 @@ impl ExchangeRepository {
 
         query!(
             r#"
-            UPDATE exchanges SET start_announcement_message = $1 WHERE id = $2    
+            UPDATE exchanges SET start_announcement_message = $1 WHERE id = $2
             "#,
             announcement_message,
             exchange_id,
@@ -465,6 +456,7 @@ pub struct SqlExchange {
     submissions_end: String,
     games_per_member: i64,
     start_announcement_message: Option<i64>,
+    ping_role: Option<i64>,
 }
 
 impl DBConvertible for Exchange {
@@ -487,6 +479,7 @@ impl DBConvertible for Exchange {
                 .start_announcement_message
                 .map(|m| m.to_db())
                 .transpose()?,
+            ping_role: self.ping_role.map(|r| r.to_db()).transpose()?,
         })
     }
 
@@ -507,6 +500,11 @@ impl DBConvertible for Exchange {
                 .start_announcement_message
                 .filter(|x| *x != 0)
                 .map(|m| MessageId::from_db(&m))
+                .transpose()?,
+            ping_role: value
+                .ping_role
+                .filter(|x| *x != 0)
+                .map(|r| RoleId::from_db(&r))
                 .transpose()?,
         })
     }
