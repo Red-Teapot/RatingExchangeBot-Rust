@@ -7,7 +7,7 @@ use tracing::{debug, error, warn};
 
 use crate::repository::ManagerRole;
 
-use super::{user_err, CommandError, CommandResult, Context};
+use super::{CommandError, CommandResult, Context, user_err};
 
 #[poise::command(
     slash_command,
@@ -42,6 +42,21 @@ async fn check_manager_role_inner(ctx: Context<'_>) -> Result<bool, CommandError
 
     debug!("Member info: {member:?}");
 
+    let setting_repository = ctx.framework().user_data.setting_repository.clone();
+    match setting_repository.get::<ManagerRole>(guild_id).await {
+        Ok(Some(manager_role)) => {
+            if member.roles.iter().any(|r| *r == manager_role.role) {
+                debug!("Manager role check passed - user is a manager");
+                return Ok(true);
+            } else {
+                debug!("User is not a manager");
+            }
+        }
+        _ => {
+            debug!("Manager role is not configured");
+        }
+    };
+
     let guild_owner = ctx.partial_guild().await.map(|g| g.owner_id);
 
     if let Some(guild_owner) = guild_owner {
@@ -65,20 +80,5 @@ async fn check_manager_role_inner(ctx: Context<'_>) -> Result<bool, CommandError
         }
     }
 
-    let setting_repository = ctx.framework().user_data.setting_repository.clone();
-    let manager_role = match setting_repository.get::<ManagerRole>(guild_id).await {
-        Ok(Some(manager_role)) => manager_role.role,
-        _ => {
-            debug!("Manager role check failed - manager role is not configured");
-            return Ok(false);
-        }
-    };
-
-    if user.has_role(ctx, guild_id, manager_role).await? {
-        debug!("Manager role check passed - user is a manager");
-        Ok(true)
-    } else {
-        debug!("Manager role check failed - user is not a manager");
-        Ok(false)
-    }
+    Ok(false)
 }
