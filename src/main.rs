@@ -14,17 +14,18 @@ use std::{process::exit, sync::Arc};
 
 use assignment_service::AssignmentService;
 
-use poise::{serenity_prelude::*, Framework};
+use poise::{Framework, serenity_prelude::*};
 use poise_error_handler::handle_error;
 use repository::{
     AssignmentRepository, ExchangeRepository, PlayedGameRepository, SettingRepository,
     SubmissionRepository,
 };
 use serde::Deserialize;
-use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
+use sqlx::{Pool, Sqlite, SqlitePool, sqlite::SqlitePoolOptions};
 use tokio::{select, signal, sync::Notify};
-use tracing::{error, info, info_span, warn, Instrument};
+use tracing::{Instrument, error, info, info_span, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use utils::permission_service::PermissionService;
 
 #[derive(Debug, Deserialize)]
 struct AppConfig {
@@ -40,6 +41,7 @@ pub struct BotState {
     pub played_game_repository: Arc<PlayedGameRepository>,
     pub assignment_repository: Arc<AssignmentRepository>,
     pub setting_repository: Arc<SettingRepository>,
+    pub permission_service: Arc<PermissionService>,
 }
 
 #[tracing::instrument]
@@ -81,14 +83,7 @@ async fn main() {
     let shutdown_notify = Arc::new(Notify::new());
     let assignment_service_shutdown = shutdown_notify.clone();
 
-    let app_state = BotState {
-        exchange_repository: Arc::new(ExchangeRepository::new(db_pool.clone())),
-        submission_repository: Arc::new(SubmissionRepository::new(db_pool.clone())),
-        played_game_repository: Arc::new(PlayedGameRepository::new(db_pool.clone())),
-        assignment_repository: Arc::new(AssignmentRepository::new(db_pool.clone())),
-        setting_repository: Arc::new(SettingRepository::new(db_pool.clone())),
-    };
-
+    let bot_db_pool = db_pool.clone();
     let framework = Framework::builder()
         .options(poise::FrameworkOptions {
             commands: vec![
@@ -127,16 +122,11 @@ async fn main() {
                         }
                     }
 
-                    AssignmentService::create_and_start(
-                        assignment_service_shutdown,
+                    Ok(create_bot_state(
+                        bot_db_pool,
                         ctx.http.clone(),
-                        app_state.exchange_repository.clone(),
-                        app_state.submission_repository.clone(),
-                        app_state.played_game_repository.clone(),
-                        app_state.assignment_repository.clone(),
-                    );
-
-                    Ok(app_state)
+                        assignment_service_shutdown,
+                    ))
                 }
                 .instrument(info_span!("bot_setup")),
             )
@@ -168,6 +158,43 @@ async fn main() {
             }
         },
     };
+}
+
+fn create_bot_state(
+    db_pool: Pool<Sqlite>,
+    http: Arc<Http>,
+    assignment_service_shutdown: Arc<Notify>,
+) -> BotState {
+    let exchange_repository = Arc::new(ExchangeRepository::new(db_pool.clone()));
+    let submission_repository = Arc::new(SubmissionRepository::new(db_pool.clone()));
+    let played_game_repository = Arc::new(PlayedGameRepository::new(db_pool.clone()));
+    let assignment_repository = Arc::new(AssignmentRepository::new(db_pool.clone()));
+    let setting_repository = Arc::new(SettingRepository::new(db_pool.clone()));
+
+    let permission_service = Arc::new(PermissionService::new(
+        http.clone(),
+        setting_repository.clone(),
+    ));
+
+    permission_service.start();
+
+    AssignmentService::create_and_start(
+        assignment_service_shutdown,
+        http.clone(),
+        exchange_repository.clone(),
+        submission_repository.clone(),
+        played_game_repository.clone(),
+        assignment_repository.clone(),
+    );
+
+    BotState {
+        exchange_repository,
+        submission_repository,
+        played_game_repository,
+        assignment_repository,
+        setting_repository,
+        permission_service,
+    }
 }
 
 #[tracing::instrument(skip(url))]

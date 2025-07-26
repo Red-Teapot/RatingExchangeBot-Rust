@@ -1,7 +1,7 @@
 use poise::{Context, CreateReply, FrameworkError};
 use tracing::{error, warn};
 
-use crate::{commands::CommandError, BotState};
+use crate::{BotState, commands::CommandError};
 
 pub async fn handle_error(error: poise::FrameworkError<'_, BotState, CommandError>) {
     use FrameworkError::*;
@@ -123,7 +123,7 @@ pub async fn handle_error(error: poise::FrameworkError<'_, BotState, CommandErro
                     error
                 )
             } else {
-                "Sorry, can't run this command due to a failed command check.".to_string()
+                "Sorry, you are not allowed to run this command.".to_string()
             };
 
             reply_with_error(ctx, &message).await;
