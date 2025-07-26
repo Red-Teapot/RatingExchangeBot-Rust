@@ -1,1 +1,8 @@
 /target
+/.git
+*.sqlite
+*.sqlite3
+*.sqlite-shm
+*.sqlite3-shm
+*.sqlite-wal
+*.sqlite3-wal
