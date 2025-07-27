@@ -23,7 +23,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Set Up the Database
         run: |
-          cargo install sqlx-cli
+          cargo install --force sqlx-cli
           cargo sqlx database setup
       - name: Build
         run: cargo build --profile dev
