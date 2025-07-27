@@ -1,0 +1,15 @@
+name: Run Tests
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: cargo build --profile dev
+      - name: Run Tests
+        run: cargo test --profile dev
