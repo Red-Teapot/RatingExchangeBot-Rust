@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+env:
+  DATABASE_URL: "sqlite://rebot.sqlite3?mode=rwc"
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -21,7 +24,6 @@ jobs:
       - name: Set Up the Database
         run: |
           cargo install sqlx-cli
-          export DATABASE_URL="sqlite://rebot.sqlite3?mode=rwc"
           cargo sqlx database setup
       - name: Build
         run: cargo build --profile dev
