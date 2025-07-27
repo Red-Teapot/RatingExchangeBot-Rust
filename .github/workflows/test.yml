@@ -28,7 +28,7 @@ jobs:
         run: |
           SQLX_CLI_VERSION="$(sed -rn 's/^sqlx = \{ version = "([0-9.]+)".*$/\1/p' Cargo.toml)"
           echo "Required sqlx-cli version: $SQLX_CLI_VERSION"
-          cargo install sqlx-cli --force --version "$SQLX_CLI_VERSION"
+          cargo install sqlx-cli --force --version "$SQLX_CLI_VERSION" --no-default-features --features sqlite
 
       - name: Set Up the Database
         run: sqlx database setup
