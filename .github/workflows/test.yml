@@ -21,10 +21,6 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Set Up the Database
-        run: |
-          which cargo-sqlx || cargo install sqlx-cli
-          cargo sqlx database setup
       - name: Build
         run: cargo build --profile dev
       - name: Run Tests
