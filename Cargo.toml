@@ -14,7 +14,7 @@ envy = "0.4.2"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter", "fmt"] }
 
-time = "0.3.41"
+time = "0.3.42"
 regex = "1.11.1"
 lazy-regex = "3.4.1"
 deunicode = "1.6.2"
