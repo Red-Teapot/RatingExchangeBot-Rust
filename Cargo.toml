@@ -15,7 +15,7 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter", "fmt"] }
 
 time = "0.3.44"
-regex = "1.12.2"
+regex = "1.12.3"
 lazy-regex = "3.5.1"
 deunicode = "1.6.2"
 strum = { version = "0.27.1", features = ["derive"] }
