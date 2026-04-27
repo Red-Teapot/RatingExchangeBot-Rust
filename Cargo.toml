@@ -16,7 +16,7 @@ tracing-subscriber = { version = "0.3.22", features = ["env-filter", "fmt"] }
 
 time = "0.3.47"
 regex = "1.12.3"
-lazy-regex = "3.5.1"
+lazy-regex = "3.6.0"
 deunicode = "1.6.2"
 strum = { version = "0.28.0", features = ["derive"] }
 bimap = "0.6.3"
