@@ -43,7 +43,7 @@ poise = "0.6.1"
 indoc = "2.0.7"
 
 [dev-dependencies]
-test-log = { version = "0.2.19", default-features = false, features = [
+test-log = { version = "0.2.20", default-features = false, features = [
     "trace",
 ] }
 map-macro = "0.3.0"
