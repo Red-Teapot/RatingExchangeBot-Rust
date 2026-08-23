@@ -2,7 +2,7 @@
   description = "A Discord bot for jam rating exchanges a.k.a. review swaps";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -20,7 +20,7 @@
         };
         toolchain = (pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml);
         craneLib = (crane.mkLib pkgs).overrideToolchain toolchain;
-        
+
         sqlFilter = path: _type: null != builtins.match ".*sql$" path;
         sqlOrCargo = path: type: (sqlFilter path type) || (craneLib.filterCargoSources path type);
         src = pkgs.lib.cleanSourceWith {
@@ -43,7 +43,7 @@
         };
 
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
-        
+
         crate = craneLib.buildPackage (commonArgs // {
           inherit cargoArtifacts;
 
@@ -61,7 +61,7 @@
         checks = {
           inherit crate;
         };
-        
+
         packages = rec {
           executable = crate;
 
@@ -75,10 +75,10 @@
             copyToRoot = [ executable pkgs.cacert ];
           };
         };
-      
+
         devShells.default = craneLib.devShell {
           checks = self.checks.${system};
-          
+
           packages = [ pkgs.sqlx-cli pkgs.sqlite-interactive ];
         };
       }
